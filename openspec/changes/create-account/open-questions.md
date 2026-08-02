@@ -1,36 +1,23 @@
-# Perguntas abertas da criação de conta
+# Decisões e perguntas da criação de conta
 
-As decisões abaixo afetam segurança, privacidade, modelo de dados ou comportamento de negócio. Nenhuma implementação deve iniciar antes da aprovação humana das questões ainda abertas.
+As decisões abaixo afetam segurança, privacidade, modelo de dados ou comportamento de negócio. Nenhuma implementação deve iniciar antes da aprovação humana dos artefatos desta change.
 
-## Decisões ainda abertas
+## Decisões de produto e dados resolvidas
 
-### 1. Relação entre conta e organização
+- Relação entre conta, organização e membership: serão criadas em fluxos separados. Esta change não criará organização nem membership.
+- Elegibilidade: o cadastro será aberto, com proteções contra abuso compatíveis com esse modelo.
+- Identificador: o e-mail será o identificador único de login, normalizado e único sem distinção entre maiúsculas e minúsculas.
+- Credencial: a primeira versão usará senha local.
+- Dados pessoais: a primeira versão coletará somente o e-mail; não coletará nome, telefone, CPF, endereço ou outros dados.
 
-Uma conta criada nesta change também cria automaticamente uma organização inicial e uma membership administrativa, ou conta, organização e membership serão criadas em fluxos separados?
+## Decisões de segurança resolvidas
 
-Trade-off: criar tudo no primeiro cadastro simplifica o onboarding da primeira empresa, mas mistura domínios e antecipa regras de organização e papéis. Separar os fluxos preserva as fronteiras do roadmap, mas exige definir como a primeira conta alcança uma organização.
+- Política de senha: aceitar de 12 a 128 caracteres, sem regras obrigatórias de composição.
+- Hashing: usar Argon2id com parâmetros definidos e testáveis na implementação.
+- Proteção contra abuso: limitar cadastro aberto a cinco tentativas por endereço IP e três por e-mail normalizado em uma janela de quinze minutos.
+- E-mail já cadastrado: devolver resposta indistinguível do cadastro novo, sem criar uma segunda conta.
 
-### 2. Elegibilidade do cadastro
-
-O cadastro inicial será aberto, por convite ou por provisionamento administrativo?
-
-Trade-off: cadastro aberto reduz fricção, mas, sem confirmação de e-mail nesta etapa, exige proteções adicionais contra abuso. Convite ou provisionamento reduz a exposição, mas depende de capacidades ainda fora do escopo.
-
-### 3. Identificador de login
-
-O e-mail será o identificador único de login?
-
-### 4. Credencial inicial
-
-O cadastro inicial aceitará senha local ou um provedor externo de identidade?
-
-Trade-off: senha local mantém a fundação independente, mas exige hashing seguro, política mínima de senha, limitação de tentativas e respostas que não revelem a existência de conta. Provedor externo introduz dependência, tratamento adicional de dados e novos fluxos de privacidade.
-
-### 5. Dados pessoais e minimização
-
-Quais dados além do e-mail são realmente necessários para criar e operar a conta inicial, qual é a finalidade de cada campo e qual será a política de exclusão de contas sem uso?
-
-Direção inicial recomendada: e-mail obrigatório; nome opcional ou obrigatório somente quando houver finalidade operacional aprovada; não coletar telefone, CPF, endereço ou outros dados nesta primeira change.
+Não há questões bloqueantes em aberto nesta change. Os artefatos seguem para revisão humana antes da implementação.
 
 ## Decisões adiadas
 

@@ -6,7 +6,7 @@
 
 ## Status
 
-Em proposta. Esta change nao esta aprovada para implementacao.
+Pronta para revisão humana. Esta change não está aprovada para implementação.
 
 ## Problema
 
@@ -18,32 +18,35 @@ Definir e implementar o cadastro inicial de uma conta interna, com dados minimos
 
 ## Escopo pretendido
 
-- criar uma conta interna a partir de dados definidos e justificados;
-- proteger a credencial no armazenamento;
-- impedir duplicidade de identificador de login;
-- retornar erros que nao exponham segredos;
+- permitir cadastro aberto de conta interna com e-mail e senha local;
+- coletar somente e-mail, normalizado e único sem distinção entre maiúsculas e minúsculas;
+- proteger a senha com Argon2id, aceitando de 12 a 128 caracteres;
+- impedir duplicidade de identificador de login sem revelar se a conta existe;
+- limitar cadastro a cinco tentativas por endereço IP e três por e-mail normalizado em quinze minutos;
+- retornar respostas que não exponham segredos nem permitam enumeração de contas;
 - registrar os requisitos de privacidade e seguranca aplicaveis;
 - incluir testes unitarios, de aplicacao, integracao PostgreSQL e autorizacao quando aplicavel.
 
 ## Fora do escopo
 
 - autenticacao, sessao e logout;
-- criacao de organizacao;
-- membership, papeis e convites;
-- recuperacao ou redefinicao de credencial;
+- criação de organização;
+- membership, papéis e convites;
+- recuperação ou redefinição de credencial;
+- confirmação e envio de e-mail;
 - MFA;
 - portal do cliente;
-- notificacoes por e-mail;
+- notificações por e-mail;
 - exclusao e exportacao de dados.
 
 ## Riscos
 
-- permitir cadastro sem definir como a conta se vinculara posteriormente a uma organizacao;
-- coletar dados pessoais sem finalidade ou retencao definida;
+- permitir abuso de cadastro aberto ou enumeração de contas;
+- coletar dados pessoais sem finalidade definida;
 - vazar informacao sobre contas existentes;
 - armazenar ou registrar credenciais de forma insegura;
 - definir uma interface HTTP antes de resolver requisitos de autenticacao e protecao contra abuso.
 
 ## Criterio para avancar
 
-As questoes em `open-questions.md` devem receber decisao humana antes de elaborar design, delta spec, tarefas ou codigo.
+Os artefatos desta change devem receber revisão e aprovação humana antes da implementação.

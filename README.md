@@ -38,7 +38,11 @@ A fundacao tecnica foi concluida e arquivada localmente. A abertura da pull requ
 
 ## Change ativa
 
-Nenhuma. A proxima capacidade deve iniciar uma nova change OpenSpec aprovada.
+Change em proposta para criação de conta interna:
+
+`openspec/changes/create-account/`
+
+Nenhum código será implementado até a aprovação humana dos artefatos da change.
 
 ## Execução local
 
