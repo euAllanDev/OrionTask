@@ -28,6 +28,7 @@ Implementar cadastro aberto de conta interna no módulo `identity`, sem criar or
 - Argon2id será configurado por adapter de segurança; seus parâmetros serão cobertos por testes de integração e não pertencerão ao domínio.
 - O limite é de cinco tentativas por IP e três por e-mail normalizado a cada quinze minutos. A resposta de limite não deve incluir dados sobre contas.
 - A resposta para e-mail existente é indistinguível da resposta de criação bem-sucedida.
+- O adapter de persistência deve verificar a existência do e-mail normalizado antes de tentar inserir, evitando que a violação esperada de unicidade seja registrada pelo Hibernate com o e-mail bruto. A constraint única permanece como proteção contra concorrência.
 - O endpoint deve validar entrada, rejeitar campos não permitidos e evitar mass assignment.
 - Logs e auditoria não devem conter senha, hash ou e-mail bruto. A auditoria registra apenas o tipo de evento e, após criação, o identificador da conta.
 
