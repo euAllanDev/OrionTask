@@ -7,7 +7,7 @@
 .gradle/
 build/
 target/
-out/
+/out/
 *.class
 
 # IDE
