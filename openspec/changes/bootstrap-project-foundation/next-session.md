@@ -2,9 +2,9 @@
 
 ## Ponto de partida
 
-Retomar na change ativa `bootstrap-project-foundation`. A aprovação humana do delta spec foi confirmada e o build atual passou com `mvnw.cmd verify` em 2 de agosto de 2026, com Docker e Testcontainers, mas a change continua em implementação.
+Retomar na change ativa `bootstrap-project-foundation`. A aprovação humana da implementação foi concluída e a fundação foi registrada no commit `bfa5a79`. O build passou com `mvnw.cmd verify` em 2 de agosto de 2026, com Docker e Testcontainers, mas a change continua em implementação.
 
-Java 21 é definido por `maven.compiler.release` e validado pelo Maven Enforcer. Maven Toolchains não será usado nesta fundação para evitar a configuração local adicional de `toolchains.xml`. O próximo passo é validar o build em clone limpo.
+Java 21 é definido por `maven.compiler.release` e validado pelo Maven Enforcer. Maven Toolchains não será usado nesta fundação para evitar a configuração local adicional de `toolchains.xml`. A verificacao em clone limpo passou em 2 de agosto de 2026.
 
 ## Estado atual
 
@@ -21,7 +21,8 @@ Java 21 é definido por `maven.compiler.release` e validado pelo Maven Enforcer.
 - repositorio Git proprio na raiz do OrionTask, com `backend/mvnw` rastreado como executavel;
 - health check restrito a `/actuator/health`, sem detalhes, componentes ou grupos;
 - `mvnw.cmd verify` passou em 2 de agosto de 2026 com PostgreSQL 17 no Testcontainers, Flyway, ArchUnit, Spotless e Checkstyle.
-- alterações da fundação estão no staging area, sem commit criado.
+- a verificacao em clone limpo com `mvnw.cmd verify` passou em 2 de agosto de 2026.
+- alterações da fundação foram registradas no commit `bfa5a79`.
 
 ## Artefatos para ler primeiro
 
@@ -35,12 +36,9 @@ Java 21 é definido por `maven.compiler.release` e validado pelo Maven Enforcer.
 
 ## Próximos passos
 
-1. Executar verificação em clone limpo com o Maven Wrapper.
-2. Realizar revisão humana da implementação contra `proposal.md`, `design.md` e o delta spec.
-3. Criar o commit da fundação após confirmação humana do diff staged.
-4. Confirmar que a fundação expõe exclusivamente `/actuator/health`; OpenAPI foi adiada para a primeira capacidade HTTP de negócio.
-5. Abrir pull request e aguardar CI verde.
-6. Após a integração, arquivar a change e incorporar o delta em `openspec/specs/`.
+1. Confirmar que a fundação expõe exclusivamente `/actuator/health`; OpenAPI foi adiada para a primeira capacidade HTTP de negócio.
+2. Abrir pull request e aguardar CI verde.
+3. Após a integração, arquivar a change e incorporar o delta em `openspec/specs/`.
 
 Nao criar funcionalidades de identidade, organizacoes, clientes, tickets, frontend, anexos ou notificacoes nesta change.
 

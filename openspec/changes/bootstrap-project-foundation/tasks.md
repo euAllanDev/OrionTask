@@ -58,7 +58,7 @@
 
 ## 7. Verificação
 
-- [ ] Clonar em ambiente limpo
+- [x] Clonar em ambiente limpo e executar `mvnw.cmd verify` em 2 de agosto de 2026
 - [x] Subir PostgreSQL
 - [x] Executar aplicação
 - [x] Confirmar health check
@@ -66,4 +66,4 @@
 - [x] Confirmar ausência de endpoints de negócio
 - [x] Confirmar ausência de segredos
 - [x] Executar `mvnw.cmd verify` com Docker e Testcontainers em 2 de agosto de 2026
-- [ ] Comparar implementação com proposal e design
+- [x] Comparar implementação com proposal e design em revisão humana

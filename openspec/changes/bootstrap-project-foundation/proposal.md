@@ -6,7 +6,7 @@
 
 ## Status
 
-Em implementação. A fundação está staged e `mvnw.cmd verify` passou localmente em 2 de agosto de 2026 com Docker e Testcontainers; faltam a verificação em clone limpo e a revisão humana antes do archive.
+Em implementação. A fundação foi registrada no commit `bfa5a79`. A verificacao em clone limpo com `mvnw.cmd verify` passou em 2 de agosto de 2026, com Docker e Testcontainers. Faltam a pull request com CI verde e o archive da change.
 
 ## Problema
 
