@@ -6,7 +6,7 @@
 
 ## Status
 
-Em implementação. A fundação foi registrada no commit `bfa5a79`. A verificacao em clone limpo com `mvnw.cmd verify` passou em 2 de agosto de 2026, com Docker e Testcontainers. Faltam a pull request com CI verde e o archive da change.
+Arquivada localmente em 2 de agosto de 2026. A fundacao foi registrada no commit `bfa5a79` e a verificacao em clone limpo com `mvnw.cmd verify` passou com Docker e Testcontainers. A abertura da pull request e a validacao do CI remoto foram adiadas por decisao do responsavel.
 
 ## Problema
 

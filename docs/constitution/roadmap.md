@@ -4,13 +4,13 @@ Este roadmap é vivo. Cada item funcional deve ser executado como uma change Ope
 
 ## Fase 0 — Fundação
 
-- [ ] Bootstrap do repositório e ferramentas
-- [ ] Estrutura OpenSpec
-- [ ] Constituição do projeto
-- [ ] Regras arquiteturais com ArchUnit
-- [ ] Pipeline inicial de CI
-- [ ] Ambiente local com PostgreSQL
-- [ ] Convenções de commits, branches e revisão
+- [x] Bootstrap do repositório e ferramentas
+- [x] Estrutura OpenSpec
+- [x] Constituição do projeto
+- [x] Regras arquiteturais com ArchUnit
+- [x] Pipeline inicial de CI
+- [x] Ambiente local com PostgreSQL
+- [x] Convenções de commits, branches e revisão
 
 ## Fase 1 — Identidade e organizações
 

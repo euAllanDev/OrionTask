@@ -15,7 +15,7 @@ Este repositório será desenvolvido com:
 
 ## Estado atual
 
-O projeto está na fase de fundação. A change `bootstrap-project-foundation` está em implementação; não há funcionalidades de negócio disponíveis.
+A fundacao tecnica foi concluida e arquivada localmente. A abertura da pull request e a validacao remota do CI foram adiadas por decisao do responsavel; nao ha funcionalidades de negocio disponiveis.
 
 ## Documentos fundamentais
 
@@ -38,9 +38,7 @@ O projeto está na fase de fundação. A change `bootstrap-project-foundation` e
 
 ## Change ativa
 
-Change aprovada para a fundação técnica:
-
-`openspec/changes/bootstrap-project-foundation/`
+Nenhuma. A proxima capacidade deve iniciar uma nova change OpenSpec aprovada.
 
 ## Execução local
 
