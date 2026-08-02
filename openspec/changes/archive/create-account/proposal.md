@@ -6,7 +6,7 @@
 
 ## Status
 
-Pronta para revisão humana. Esta change não está aprovada para implementação.
+Arquivada localmente em 2 de agosto de 2026 após revisão humana e execução bem-sucedida de `backend/mvnw.cmd verify`.
 
 ## Problema
 

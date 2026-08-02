@@ -15,7 +15,7 @@ Este repositório será desenvolvido com:
 
 ## Estado atual
 
-A fundacao tecnica foi concluida e arquivada localmente. A abertura da pull request e a validacao remota do CI foram adiadas por decisao do responsavel; nao ha funcionalidades de negocio disponiveis.
+A fundação técnica e a criação de conta interna foram concluídas e arquivadas localmente. A abertura de pull requests e a validação remota do CI permanecem adiadas por decisão do responsável.
 
 ## Documentos fundamentais
 
@@ -38,11 +38,7 @@ A fundacao tecnica foi concluida e arquivada localmente. A abertura da pull requ
 
 ## Change ativa
 
-Change em proposta para criação de conta interna:
-
-`openspec/changes/create-account/`
-
-Nenhum código será implementado até a aprovação humana dos artefatos da change.
+Nenhuma. A próxima capacidade deve iniciar uma nova change OpenSpec aprovada.
 
 ## Execução local
 
@@ -54,5 +50,4 @@ Pré-requisitos: Java 21 e Docker Desktop em execução.
 4. Execute `mvnw.cmd spring-boot:run` no Windows ou `./mvnw spring-boot:run` em ambientes POSIX.
 5. Consulte `http://localhost:8080/actuator/health`.
 
-O único endpoint HTTP exposto nesta fundação é `/actuator/health`.
-# OrionTask
+Os endpoints atuais são `/actuator/health` e `POST /api/v1/accounts`.
