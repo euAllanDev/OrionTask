@@ -1,0 +1,28 @@
+project:
+  name: OrionTask
+  language: pt-BR
+
+workflow:
+  require_human_review_before_apply: true
+  require_verify_before_archive: true
+  prefer_small_changes: true
+
+context:
+  required:
+    - docs/constitution/mission.md
+    - docs/constitution/principles.md
+    - docs/constitution/tech-stack.md
+    - docs/constitution/roadmap.md
+    - AGENTS.md
+
+specs:
+  normative_keywords:
+    - DEVE
+    - NÃO DEVE
+    - DEVERIA
+    - PODE
+
+quality:
+  require_acceptance_scenarios: true
+  require_security_review: true
+  require_privacy_review_when_personal_data_changes: true

@@ -15,9 +15,7 @@ Este repositório será desenvolvido com:
 
 ## Estado atual
 
-O projeto está na fase de fundação. A change `bootstrap-project-foundation` foi aprovada e aguarda solicitação explícita para implementação.
-
-Nenhum código de produção deve ser criado antes da aprovação dos documentos fundamentais e da change inicial.
+O projeto está na fase de fundação. A change `bootstrap-project-foundation` está em implementação; não há funcionalidades de negócio disponíveis.
 
 ## Documentos fundamentais
 
@@ -40,9 +38,19 @@ Nenhum código de produção deve ser criado antes da aprovação dos documentos
 
 ## Change ativa
 
-Change aprovada para a fundação técnica, ainda sem código de produção:
+Change aprovada para a fundação técnica:
 
 `openspec/changes/bootstrap-project-foundation/`
 
-O ponto de retomada da próxima sessão está em `openspec/changes/bootstrap-project-foundation/next-session.md`.
+## Execução local
+
+Pré-requisitos: Java 21 e Docker Desktop em execução.
+
+1. Copie `.env.example` para `.env` e ajuste somente os valores locais, se necessário.
+2. Execute `docker compose --env-file ../.env up -d` em `backend/` para iniciar o PostgreSQL.
+3. Execute `mvnw.cmd verify` no Windows ou `./mvnw verify` em ambientes POSIX, também em `backend/`.
+4. Execute `mvnw.cmd spring-boot:run` no Windows ou `./mvnw spring-boot:run` em ambientes POSIX.
+5. Consulte `http://localhost:8080/actuator/health`.
+
+O único endpoint HTTP exposto nesta fundação é `/actuator/health`.
 # OrionTask
