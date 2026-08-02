@@ -1,33 +1,74 @@
-# Open Questions
+# Perguntas abertas da criação de conta
 
-As decisoes abaixo afetam seguranca, privacidade, modelo de dados ou comportamento de negocio. Nenhuma implementacao deve iniciar antes da aprovacao humana.
+As decisões abaixo afetam segurança, privacidade, modelo de dados ou comportamento de negócio. Nenhuma implementação deve iniciar antes da aprovação humana das questões ainda abertas.
 
-## 1. Relacao entre conta e organizacao
+## Decisões ainda abertas
 
-Uma conta criada nesta change deve tambem criar uma organizacao inicial e tornar a pessoa criadora membro administrador, ou a criacao de organizacao ocorrera obrigatoriamente em uma change e fluxo separados?
+### 1. Relação entre conta e organização
 
-Trade-off: criar tudo no primeiro cadastro reduz etapas para a primeira empresa, mas mistura escopos do roadmap e acopla a conta a regras ainda nao definidas de organizacao e papeis.
+Uma conta criada nesta change também cria automaticamente uma organização inicial e uma membership administrativa, ou conta, organização e membership serão criadas em fluxos separados?
 
-## 2. Elegibilidade do cadastro
+Trade-off: criar tudo no primeiro cadastro simplifica o onboarding da primeira empresa, mas mistura domínios e antecipa regras de organização e papéis. Separar os fluxos preserva as fronteiras do roadmap, mas exige definir como a primeira conta alcança uma organização.
 
-O cadastro inicial sera aberto a qualquer pessoa com e-mail valido, restrito a convite ou restrito a provisionamento administrativo?
+### 2. Elegibilidade do cadastro
 
-Trade-off: cadastro aberto reduz friccao, mas exige protecao contra abuso e verificacao de e-mail; convite ou provisionamento reduz exposicao, mas depende de capacidades ainda fora do escopo.
+O cadastro inicial será aberto, por convite ou por provisionamento administrativo?
 
-## 3. Identificador e verificacao
+Trade-off: cadastro aberto reduz fricção, mas, sem confirmação de e-mail nesta etapa, exige proteções adicionais contra abuso. Convite ou provisionamento reduz a exposição, mas depende de capacidades ainda fora do escopo.
 
-O e-mail sera o identificador unico de login? A conta deve permanecer inativa ate confirmar a posse do e-mail?
+### 3. Identificador de login
 
-Trade-off: e-mail verificado reduz contas indevidas e riscos de recuperacao futura, mas requer envio de e-mail, que pertence a uma capacidade posterior.
+O e-mail será o identificador único de login?
 
-## 4. Credencial inicial
+### 4. Credencial inicial
 
-Qual metodo de credencial sera aceito no cadastro inicial e qual politica minima de senha deve ser aplicada?
+O cadastro inicial aceitará senha local ou um provedor externo de identidade?
 
-Trade-off: senha local permite uma fundacao independente, mas exige definir hashing, requisitos, rate limiting e recuperacao; login externo introduz dependencia e fluxo de privacidade adicionais.
+Trade-off: senha local mantém a fundação independente, mas exige hashing seguro, política mínima de senha, limitação de tentativas e respostas que não revelem a existência de conta. Provedor externo introduz dependência, tratamento adicional de dados e novos fluxos de privacidade.
 
-## 5. Dados pessoais e retencao
+### 5. Dados pessoais e minimização
 
-Quais dados alem de e-mail sao necessarios no cadastro inicial, para qual finalidade e por quanto tempo serao retidos se a conta nao concluir a ativacao?
+Quais dados além do e-mail são realmente necessários para criar e operar a conta inicial, qual é a finalidade de cada campo e qual será a política de exclusão de contas sem uso?
 
-Trade-off: coletar apenas e-mail minimiza dados, mas pode limitar identificacao operacional; nome adiciona dado pessoal que exige finalidade e politica de retencao.
+Direção inicial recomendada: e-mail obrigatório; nome opcional ou obrigatório somente quando houver finalidade operacional aprovada; não coletar telefone, CPF, endereço ou outros dados nesta primeira change.
+
+## Decisões adiadas
+
+- A verificação e a confirmação da posse do e-mail permanecem planejadas para uma change futura de identidade e comunicação, mas não farão parte desta primeira change.
+- Tokens de ativação.
+- Reenvio de confirmação.
+- Expiração de ativação.
+- Integração com serviço de e-mail.
+- Políticas de conta pendente por falta de confirmação.
+- Recuperação de senha.
+
+A primeira versão não deve criar um estado de ativação que dependa de um e-mail que o sistema ainda não consegue enviar. Não devem ser introduzidos estados como `PENDING_EMAIL_VERIFICATION`, `UNVERIFIED` ou `AWAITING_ACTIVATION` sem outra justificativa funcional aprovada.
+
+## Requisitos e decisões de segurança
+
+Mesmo sem confirmação de e-mail, a change deve considerar:
+
+- normalização de e-mail;
+- unicidade case-insensitive;
+- prevenção de enumeração de contas;
+- hashing seguro de senha e proibição de armazenamento em texto puro;
+- política mínima de senha, se senha local for escolhida;
+- validação de entrada e proteção contra mass assignment;
+- rate limiting ou estratégia equivalente para cadastro e, quando implementado, login;
+- auditoria mínima de eventos de segurança;
+- proteção de dados e proibição de senhas nos logs;
+- sessões revogáveis quando o login for implementado;
+- recuperação de senha futura fora do escopo desta change.
+
+## Fora do escopo desta change
+
+- confirmação de e-mail;
+- envio de e-mail;
+- recuperação de senha;
+- alteração de e-mail com reconfirmação;
+- MFA;
+- login social;
+- login sem senha;
+- convites por e-mail;
+- notificações;
+- portal do cliente.
