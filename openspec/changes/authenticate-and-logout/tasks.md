@@ -17,24 +17,35 @@
 - [x] Tornar o logout idempotente e restrito à sessão atual
 - [x] Retornar resposta uniforme para e-mail inexistente e senha incorreta
 - [x] Executar verificação de hash equivalente quando a conta não existir
-- [ ] Criar testes unitários de autenticação, expiração, atividade limitada, revogação e isolamento
+- [x] Criar testes de autenticação válida e credenciais inválidas
+- [x] Criar testes de expiração por inatividade e duração absoluta
+- [x] Criar testes de revogação da sessão
+- [ ] Criar teste dedicado para atualização limitada da última atividade
+- [ ] Criar testes de isolamento entre contas diferentes
 
 ## 3. Persistência e segurança
 
 - [x] Criar migration de sessões com UUIDs, conta, representação derivada única do token, criação, atividade, expiração absoluta, revogação e índices de busca, conta e limpeza
 - [x] Gerar token opaco com ao menos 256 bits de entropia criptograficamente segura
-- [x] Persistir somente representação derivada do token, usando HMAC ou hash adequado; não usar Argon2id para token de sessão
+- [x] Persistir somente HMAC-SHA-256 do token de sessão; não usar Argon2id para token de sessão
 - [x] Configurar cookie `__Host-oriontask-session` com `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/` e sem `Domain`
 - [x] Garantir que token, cookie e representações derivadas não apareçam em respostas JSON, logs, auditoria, métricas, traces ou erros
 - [x] Integrar a sessão persistida ao Spring Security sem criar mecanismo concorrente de autenticação
+- [x] Não utilizar `HttpSession` ou `JSESSIONID` como fonte da identidade autenticada
+- [x] Persistir e recuperar o contexto autenticado exclusivamente pela sessão própria do OrionTask
 - [x] Configurar proteção CSRF para login, logout e rotas mutáveis
 - [x] Emitir token CSRF em `GET /api/v1/csrf` sem autenticar ou expor token de sessão
-- [x] Renovar e invalidar token CSRF após login, logout, invalidação ou rejeição
-- [x] Manter o Spring Security stateless, sem criar contexto técnico antes do login que exija renovação contra session fixation
-- [x] Implementar limite de cinco falhas por identificador protegido derivado do e-mail normalizado em quinze minutos, com atraso progressivo e bloqueio de quinze minutos
-- [x] Reiniciar ou remover contador por identificador protegido após autenticação bem-sucedida
-- [x] Implementar limite de vinte tentativas por origem confiável em quinze minutos com `429` e `Retry-After` quando aplicável
-- [x] Configurar suporte a proxies explicitamente confiáveis e nunca confiar diretamente em headers enviados pelo cliente
+- [x] Invalidar o token CSRF anterior após login bem-sucedido
+- [x] Invalidar o token CSRF anterior após logout
+- [x] Permitir obtenção de novo token por `GET /api/v1/csrf`
+- [x] Implementar limite de cinco falhas por identificador protegido em quinze minutos
+- [x] Implementar bloqueio temporário de quinze minutos
+- [x] Implementar atraso progressivo sem bloquear threads por longos períodos
+- [x] Reiniciar ou remover contador após autenticação bem-sucedida
+- [x] Implementar limite de vinte tentativas por origem em quinze minutos
+- [x] Retornar `429` e `Retry-After` quando aplicável
+- [x] Ignorar headers de origem encaminhados quando não houver proxy confiável configurado
+- [x] Preparar configuração explícita para proxies confiáveis
 - [x] Registrar auditoria mínima sem dados sensíveis
 - [x] Criar testes de integração com PostgreSQL e Testcontainers
 
@@ -43,21 +54,49 @@
 - [x] Criar endpoint de login com token CSRF obrigatório
 - [x] Criar `DELETE /api/v1/session` com token CSRF obrigatório, resultado idempotente `204 No Content` e remoção incondicional do cookie
 - [x] Confirmar que login e logout não ocorrem por `GET`
-- [x] Cobrir emissão e renovação de CSRF antes do login, após login e após logout
-- [ ] Cobrir acesso anônimo, sessão válida, credencial inválida, expiração por inatividade, duração absoluta e revogação
-- [ ] Cobrir logout com sessão ativa, ausente, inexistente, expirada e revogada
-- [ ] Cobrir isolamento entre duas sessões da mesma conta e entre sessões de contas diferentes
-- [ ] Confirmar que uma sessão não autentica outra conta nem aceita `accountId` do cliente como substituto
-- [x] Cobrir rate limiting por identificador protegido e por origem confiável
+- [x] Cobrir emissão de CSRF antes do login
+- [x] Cobrir obtenção de novo CSRF após login
+- [x] Cobrir obtenção de novo CSRF após logout
+- [x] Cobrir acesso anônimo ao endpoint de CSRF
+- [x] Cobrir criação de sessão válida
+- [x] Cobrir credencial inválida
+- [x] Cobrir expiração por inatividade
+- [x] Cobrir duração absoluta
+- [x] Cobrir revogação
+- [x] Cobrir logout com sessão ativa
+- [x] Cobrir logout repetido
+- [x] Cobrir logout sem cookie
+- [ ] Cobrir logout com token ou sessão inexistente
+- [ ] Cobrir logout com sessão expirada
+- [ ] Cobrir logout com sessão previamente revogada
+- [x] Cobrir isolamento entre duas sessões da mesma conta
+- [ ] Cobrir isolamento entre sessões de contas diferentes
+- [ ] Confirmar que uma sessão não aceita `accountId` fornecido pelo cliente como substituto da identidade autenticada
+- [ ] Cobrir rejeição de requisição com token CSRF ausente
+- [ ] Cobrir rejeição de requisição com token CSRF inválido
+- [ ] Cobrir rejeição de token CSRF antigo após login ou logout
+- [x] Cobrir rate limiting por identificador protegido
+- [x] Cobrir rate limiting por origem confiável
+- [ ] Cobrir atraso progressivo entre falhas
+- [ ] Cobrir bloqueio temporário de quinze minutos
+- [ ] Cobrir reinício do contador após autenticação bem-sucedida
 - [x] Executar `backend/mvnw.cmd spotless:apply`
 - [x] Executar `backend/mvnw.cmd verify`
 - [x] Revisar o diff e confirmar ausência de dados sensíveis
 - [x] Revisar aderência entre implementação e delta spec
 - [x] Atualizar evidências e criar commit seguindo Conventional Commits
-- [ ] Realizar revisão humana antes do archive
+- [ ] Realizar revisão humana final antes do archive
 
 ## Evidências
 
-- `backend/mvnw.cmd verify` concluído em 2026-08-04: 17 testes aprovados, incluindo PostgreSQL/Testcontainers, Flyway, Spotless, Checkstyle e ArchUnit.
-- A cobertura inclui expiração por inatividade e duração absoluta no domínio, rate limiting por identificador e origem, resposta HTTP `429` com `Retry-After`, logout repetido e sem cookie, e isolamento entre duas sessões da mesma conta.
-- Permanecem pendentes cenários dedicados de atualização limitada da atividade, sessão expirada ou inexistente no logout, sessões de contas diferentes, rejeição de CSRF e tentativa de substituição de `accountId` pelo cliente.
+- `backend/mvnw.cmd verify` concluído em 2026-08-04 com 17 testes aprovados, incluindo PostgreSQL/Testcontainers, Flyway, Spotless, Checkstyle e ArchUnit.
+- Foram validados: criação de sessão, credencial inválida, expiração por inatividade, duração absoluta, revogação, rate limiting por identificador, rate limiting por origem, resposta `429` com `Retry-After`, logout repetido, logout sem cookie e isolamento entre duas sessões da mesma conta.
+- Permanecem pendentes testes dedicados para atualização limitada da atividade, logout com token ou sessão inexistente, expirada e previamente revogada, isolamento entre contas diferentes, rejeição de CSRF ausente ou inválido, token CSRF antigo, tentativa de substituição de `accountId`, atraso progressivo, bloqueio temporário e reinício do contador após login bem-sucedido.
+
+## Estado da change
+
+- implementação principal concluída;
+- build verde;
+- cobertura de critérios ainda incompleta;
+- revisão humana final pendente;
+- archive bloqueado até os testes e a revisão final.
