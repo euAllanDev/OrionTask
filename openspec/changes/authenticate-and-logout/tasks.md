@@ -48,15 +48,16 @@
 - [ ] Cobrir logout com sessão ativa, ausente, inexistente, expirada e revogada
 - [ ] Cobrir isolamento entre duas sessões da mesma conta e entre sessões de contas diferentes
 - [ ] Confirmar que uma sessão não autentica outra conta nem aceita `accountId` do cliente como substituto
-- [ ] Cobrir rate limiting por identificador protegido e por origem confiável
+- [x] Cobrir rate limiting por identificador protegido e por origem confiável
 - [x] Executar `backend/mvnw.cmd spotless:apply`
 - [x] Executar `backend/mvnw.cmd verify`
 - [x] Revisar o diff e confirmar ausência de dados sensíveis
 - [x] Revisar aderência entre implementação e delta spec
-- [ ] Atualizar evidências e criar commit seguindo Conventional Commits
+- [x] Atualizar evidências e criar commit seguindo Conventional Commits
 - [ ] Realizar revisão humana antes do archive
 
 ## Evidências
 
-- `backend/mvnw.cmd verify` concluído em 2026-08-04: 11 testes aprovados, incluindo PostgreSQL/Testcontainers, Flyway, Spotless, Checkstyle e ArchUnit.
-- Permanecem pendentes os cenários dedicados de expiração, logout sem sessão válida, isolamento entre sessões e rate limiting.
+- `backend/mvnw.cmd verify` concluído em 2026-08-04: 17 testes aprovados, incluindo PostgreSQL/Testcontainers, Flyway, Spotless, Checkstyle e ArchUnit.
+- A cobertura inclui expiração por inatividade e duração absoluta no domínio, rate limiting por identificador e origem, resposta HTTP `429` com `Retry-After`, logout repetido e sem cookie, e isolamento entre duas sessões da mesma conta.
+- Permanecem pendentes cenários dedicados de atualização limitada da atividade, sessão expirada ou inexistente no logout, sessões de contas diferentes, rejeição de CSRF e tentativa de substituição de `accountId` pelo cliente.

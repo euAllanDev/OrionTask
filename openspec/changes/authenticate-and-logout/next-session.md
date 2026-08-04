@@ -17,4 +17,4 @@ A change `authenticate-and-logout` foi aprovada para implementação em 2026-08-
 
 ## Próximo passo
 
-Cobrir os cenários pendentes em `tasks.md`, revisar a implementação e realizar revisão humana antes do archive, sem incluir organização, membership, papéis, alteração ou recuperação de senha, alteração de e-mail, MFA ou revogação global.
+Cobrir os cenários de segurança restantes em `tasks.md`, revisar a implementação e realizar revisão humana antes do archive, sem incluir organização, membership, papéis, alteração ou recuperação de senha, alteração de e-mail, MFA ou revogação global.

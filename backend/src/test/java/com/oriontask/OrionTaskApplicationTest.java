@@ -14,6 +14,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.annotation.DirtiesContext;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -98,6 +99,7 @@ class OrionTaskApplicationTest {
   }
 
   @Test
+  @DirtiesContext(methodMode = DirtiesContext.MethodMode.BEFORE_METHOD)
   void authenticationUsesCsrfAndPersistsOnlySessionTokenDerivation() throws Exception {
     String email = "login@example.com";
     String password = "long-password-6";
@@ -125,18 +127,74 @@ class OrionTaskApplicationTest {
         .doesNotContain(sessionCookie);
 
     HttpResponse<String> renewedCsrf = csrf();
+    HttpResponse<String> secondLogin =
+        login(
+            Map.of("email", email, "password", password),
+            objectMapper.readTree(renewedCsrf.body()).path("token").asText(),
+            cookieValue(renewedCsrf, "XSRF-TOKEN"));
+    assertThat(secondLogin.statusCode()).isEqualTo(204);
+
+    HttpResponse<String> csrfForLogout = csrf();
     HttpResponse<String> logout =
         logout(
-            objectMapper.readTree(renewedCsrf.body()).path("token").asText(),
-            cookieValue(renewedCsrf, "XSRF-TOKEN"),
+            objectMapper.readTree(csrfForLogout.body()).path("token").asText(),
+            cookieValue(csrfForLogout, "XSRF-TOKEN"),
             sessionCookie);
 
     assertThat(logout.statusCode()).isEqualTo(204);
     assertThat(
             jdbcTemplate.queryForObject(
-                "select revoked_at is not null from identity_authentication_sessions",
-                Boolean.class))
-        .isTrue();
+                "select count(*) from identity_authentication_sessions where revoked_at is not null",
+                Integer.class))
+        .isEqualTo(1);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from identity_authentication_sessions where revoked_at is null",
+                Integer.class))
+        .isEqualTo(1);
+
+    HttpResponse<String> csrfAfterLogout = csrf();
+    HttpResponse<String> repeatedLogout =
+        logout(
+            objectMapper.readTree(csrfAfterLogout.body()).path("token").asText(),
+            cookieValue(csrfAfterLogout, "XSRF-TOKEN"),
+            sessionCookie);
+
+    assertThat(repeatedLogout.statusCode()).isEqualTo(204);
+
+    HttpResponse<String> csrfWithoutSession = csrf();
+    HttpResponse<String> logoutWithoutSession =
+        logout(
+            objectMapper.readTree(csrfWithoutSession.body()).path("token").asText(),
+            cookieValue(csrfWithoutSession, "XSRF-TOKEN"),
+            "");
+    assertThat(logoutWithoutSession.statusCode()).isEqualTo(204);
+  }
+
+  @Test
+  @DirtiesContext(methodMode = DirtiesContext.MethodMode.BEFORE_METHOD)
+  void limitsLoginAttemptsByOriginWithRetryAfter() throws Exception {
+    HttpResponse<String> csrf = csrf();
+    String csrfToken = objectMapper.readTree(csrf.body()).path("token").asText();
+    String csrfCookie = cookieValue(csrf, "XSRF-TOKEN");
+
+    for (int index = 0; index < 20; index++) {
+      HttpResponse<String> response =
+          login(
+              Map.of("email", "unknown" + index + "@example.com", "password", "incorrect-password"),
+              csrfToken,
+              csrfCookie);
+      assertThat(response.statusCode()).isEqualTo(401);
+    }
+
+    HttpResponse<String> blocked =
+        login(
+            Map.of("email", "unknown-extra@example.com", "password", "incorrect-password"),
+            csrfToken,
+            csrfCookie);
+
+    assertThat(blocked.statusCode()).isEqualTo(429);
+    assertThat(blocked.headers().firstValue("Retry-After")).hasValue("900");
   }
 
   private HttpResponse<String> register(Map<String, String> payload) throws Exception {
@@ -175,7 +233,11 @@ class OrionTaskApplicationTest {
             .header("X-XSRF-TOKEN", csrfToken)
             .header(
                 "Cookie",
-                "XSRF-TOKEN=" + csrfCookie + "; __Host-oriontask-session=" + sessionCookie)
+                "XSRF-TOKEN="
+                    + csrfCookie
+                    + (sessionCookie.isEmpty()
+                        ? ""
+                        : "; __Host-oriontask-session=" + sessionCookie))
             .DELETE()
             .build();
     return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
