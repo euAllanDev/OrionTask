@@ -15,7 +15,7 @@ Este roadmap é vivo. Cada item funcional deve ser executado como uma change Ope
 ## Fase 1 — Identidade e organizações
 
 - [x] Criação de conta
-- [ ] Autenticação e encerramento de sessão
+- [x] Autenticação e encerramento de sessão
 - [ ] Criação de organização
 - [ ] Membership e papéis
 - [ ] Convites de usuários

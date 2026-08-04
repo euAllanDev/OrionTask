@@ -10,11 +10,11 @@ Definir a autenticacao propria e o encerramento seguro de sessoes das contas int
 
 O sistema DEVE autenticar contas exclusivamente por sessao server-side propria, persistida no PostgreSQL e associada a uma unica conta. A identidade autenticada DEVE ser recuperada exclusivamente dessa sessao persistida. O sistema NAO DEVE usar JWT autocontido nem `HttpSession` como fonte da identidade autenticada.
 
-O token opaco DEVE ter ao menos 256 bits de entropia e existir somente no cookie `__Host-oriontask-session`, configurado com `Secure`, `HttpOnly`, `SameSite=Lax` e `Path=/`, sem `Domain`. O banco DEVE armazenar somente uma representacao criptografica derivada, unica e indexada. Argon2id e exclusivo para senhas.
+O token opaco DEVE ter ao menos 256 bits de entropia de fonte criptograficamente segura e existir somente no cookie `__Host-oriontask-session`, configurado com `Secure`, `HttpOnly`, `SameSite=Lax` e `Path=/`, sem `Domain`. O banco DEVE armazenar somente uma representacao criptografica derivada, unica e indexada. Argon2id e exclusivo para senhas. O token, o cookie e sua representacao derivada nao DEVEM aparecer em respostas JSON, logs, auditoria, metricas, traces ou erros.
 
 ### Requirement: Contexto tecnico de CSRF separado
 
-O contexto tecnico de CSRF NAO DEVE autenticar a conta, substituir a sessao persistida do OrionTask nem ser considerado fonte da identidade. O identificador desse contexto DEVE ser renovado apos login e invalidado apos logout.
+O contexto tecnico de CSRF NAO DEVE autenticar a conta, substituir a sessao persistida do OrionTask nem ser considerado fonte da identidade. O `JSESSIONID` tecnico deve usar `HttpOnly`, `Secure`, `SameSite=Lax` e `Path=/`, sem `Domain`, e expirar apos trinta minutos. O perfil local pode desabilitar `Secure` somente para desenvolvimento HTTP sem TLS. O identificador desse contexto DEVE ser renovado apos login e invalidado apos logout.
 
 Login, logout e operacoes autenticadas mutaveis DEVEM exigir token CSRF valido. `GET /api/v1/csrf` DEVE ser publico, nao autenticar a pessoa, nao alterar estado de negocio e nao retornar token de sessao.
 
@@ -32,7 +32,7 @@ Logout DEVE revogar somente a sessao apresentada. Revogacao global NAO DEVE ser 
 
 ### Requirement: Resposta anti-enumeracao e protecao contra abuso
 
-E-mail inexistente e senha incorreta DEVEM retornar exatamente `401` com a mensagem `E-mail ou senha invalidos.` e sem criar sessao. Quando a conta nao existir, o sistema DEVE executar verificacao de hash equivalente.
+E-mail inexistente e senha incorreta DEVEM retornar exatamente `401` com a mensagem `E-mail ou senha inválidos.` e sem criar sessao. Quando a conta nao existir, o sistema DEVE executar verificacao de hash equivalente.
 
 Falhas de login DEVEM ser controladas por identificador protegido derivado do e-mail normalizado, sem armazenar e-mail bruto: cinco falhas em quinze minutos, atraso progressivo e bloqueio temporario de quinze minutos apos a quinta falha. Autenticacao bem-sucedida DEVE reiniciar esse contador.
 
@@ -46,6 +46,6 @@ Cada sessao DEVE pertencer a uma unica conta. Revogar uma sessao NAO DEVE afetar
 
 ### Requirement: Dados e auditoria minimos
 
-Sessoes DEVEM persistir somente dados necessarios a autenticacao e revogacao. Auditoria minima DEVE registrar login bem-sucedido, login rejeitado, limitacao aplicada, logout e revogacao de sessao, sem dados sensiveis.
+Sessoes DEVEM persistir somente dados necessarios a autenticacao e revogacao: UUID da sessao e da conta, representacao derivada unica do token, criacao, ultima atividade, expiracao absoluta e revogacao. Auditoria minima DEVE registrar login bem-sucedido, login rejeitado, limitacao aplicada, logout e revogacao de sessao, sem dados sensiveis.
 
 Logs, auditoria, metricas e traces NAO DEVEM conter senha, hash de senha, token de sessao, representacao derivada do token quando desnecessaria, cookie, token CSRF, e-mail bruto ou payload completo de autenticacao.
