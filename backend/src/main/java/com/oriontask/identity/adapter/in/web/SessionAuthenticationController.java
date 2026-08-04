@@ -6,9 +6,11 @@ import com.oriontask.identity.application.port.in.AuthenticationResult;
 import com.oriontask.identity.application.port.in.LogoutCurrentSessionUseCase;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Set;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
@@ -27,16 +29,19 @@ class SessionAuthenticationController {
   private final LogoutCurrentSessionUseCase logoutCurrentSessionUseCase;
   private final CsrfTokenRepository csrfTokenRepository;
   private final TrustedSourceIpResolver sourceIpResolver;
+  private final boolean secureTechnicalSessionCookie;
 
   SessionAuthenticationController(
       AuthenticateAccountUseCase authenticateAccountUseCase,
       LogoutCurrentSessionUseCase logoutCurrentSessionUseCase,
       CsrfTokenRepository csrfTokenRepository,
-      TrustedSourceIpResolver sourceIpResolver) {
+      TrustedSourceIpResolver sourceIpResolver,
+      @Value("${server.servlet.session.cookie.secure:true}") boolean secureTechnicalSessionCookie) {
     this.authenticateAccountUseCase = authenticateAccountUseCase;
     this.logoutCurrentSessionUseCase = logoutCurrentSessionUseCase;
     this.csrfTokenRepository = csrfTokenRepository;
     this.sourceIpResolver = sourceIpResolver;
+    this.secureTechnicalSessionCookie = secureTechnicalSessionCookie;
   }
 
   @PostMapping("/sessions")
@@ -62,8 +67,12 @@ class SessionAuthenticationController {
     }
 
     csrfTokenRepository.saveToken(null, request, response);
+    String technicalSessionId = request.changeSessionId();
     return ResponseEntity.noContent()
-        .header(HttpHeaders.SET_COOKIE, sessionCookie(result.sessionToken()))
+        .header(
+            HttpHeaders.SET_COOKIE,
+            sessionCookie(result.sessionToken()),
+            technicalSessionCookie(technicalSessionId).toString())
         .build();
   }
 
@@ -72,8 +81,15 @@ class SessionAuthenticationController {
     logoutCurrentSessionUseCase.logout(
         SessionAuthenticationFilter.sessionToken(request.getCookies()));
     csrfTokenRepository.saveToken(null, request, response);
+    HttpSession technicalSession = request.getSession(false);
+    if (technicalSession != null) {
+      technicalSession.invalidate();
+    }
     return ResponseEntity.noContent()
-        .header(HttpHeaders.SET_COOKIE, expiredSessionCookie())
+        .header(
+            HttpHeaders.SET_COOKIE,
+            expiredSessionCookie(),
+            expiredTechnicalSessionCookie().toString())
         .build();
   }
 
@@ -101,5 +117,24 @@ class SessionAuthenticationController {
         .maxAge(Duration.ZERO)
         .build()
         .toString();
+  }
+
+  private ResponseCookie technicalSessionCookie(String sessionId) {
+    return ResponseCookie.from("JSESSIONID", sessionId)
+        .secure(secureTechnicalSessionCookie)
+        .httpOnly(true)
+        .sameSite("Lax")
+        .path("/")
+        .build();
+  }
+
+  private ResponseCookie expiredTechnicalSessionCookie() {
+    return ResponseCookie.from("JSESSIONID", "")
+        .secure(secureTechnicalSessionCookie)
+        .httpOnly(true)
+        .sameSite("Lax")
+        .path("/")
+        .maxAge(Duration.ZERO)
+        .build();
   }
 }

@@ -3,3 +3,9 @@ spring:
     url: jdbc:postgresql://localhost:5432/${POSTGRES_DB:oriontask}
     username: ${POSTGRES_USER:oriontask_local}
     password: ${POSTGRES_PASSWORD:change-me-local-only}
+
+server:
+  servlet:
+    session:
+      cookie:
+        secure: false

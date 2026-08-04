@@ -23,8 +23,10 @@ import tools.jackson.databind.ObjectMapper;
 
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-    properties =
-        "oriontask.security.session-hmac-key=VGhpcy1pcy1hLXRlc3QtaG1hYy1rZXktd2l0aC0zMi1ieXRlcy0xMjM0NTY=")
+    properties = {
+      "oriontask.security.session-hmac-key=VGhpcy1pcy1hLXRlc3QtaG1hYy1rZXktd2l0aC0zMi1ieXRlcy0xMjM0NTY=",
+      "server.servlet.session.cookie.secure=true"
+    })
 @Testcontainers
 class OrionTaskApplicationTest {
 
@@ -103,17 +105,13 @@ class OrionTaskApplicationTest {
   void authenticationUsesCsrfAndPersistsOnlySessionTokenDerivation() throws Exception {
     String email = "login@example.com";
     String password = "long-password-6";
-    jdbcTemplate.update(
-        "insert into identity_accounts (id, normalized_email, password_hash, created_at) values (?, ?, ?, current_timestamp)",
-        UUID.randomUUID(),
-        email,
-        passwordHasher.hash(password));
+    UUID accountId = createAccount(email, password);
 
     HttpResponse<String> csrf = csrf();
     String csrfToken = objectMapper.readTree(csrf.body()).path("token").asText();
-    String csrfCookie = cookieValue(csrf, "XSRF-TOKEN");
+    String csrfSession = cookieValue(csrf, "JSESSIONID");
     HttpResponse<String> login =
-        login(Map.of("email", email, "password", password), csrfToken, csrfCookie);
+        login(Map.of("email", email, "password", password), csrfToken, csrfSession);
 
     assertThat(login.statusCode()).isEqualTo(204);
     String sessionCookie = cookieValue(login, "__Host-oriontask-session");
@@ -123,7 +121,9 @@ class OrionTaskApplicationTest {
         .doesNotContain("Domain=");
     assertThat(
             jdbcTemplate.queryForObject(
-                "select token_derivation from identity_authentication_sessions", String.class))
+                "select token_derivation from identity_authentication_sessions where account_id = ?",
+                String.class,
+                accountId))
         .doesNotContain(sessionCookie);
 
     HttpResponse<String> renewedCsrf = csrf();
@@ -131,33 +131,37 @@ class OrionTaskApplicationTest {
         login(
             Map.of("email", email, "password", password),
             objectMapper.readTree(renewedCsrf.body()).path("token").asText(),
-            cookieValue(renewedCsrf, "XSRF-TOKEN"));
+            cookieValue(renewedCsrf, "JSESSIONID"));
     assertThat(secondLogin.statusCode()).isEqualTo(204);
 
     HttpResponse<String> csrfForLogout = csrf();
     HttpResponse<String> logout =
         logout(
             objectMapper.readTree(csrfForLogout.body()).path("token").asText(),
-            cookieValue(csrfForLogout, "XSRF-TOKEN"),
+            cookieValue(csrfForLogout, "JSESSIONID"),
             sessionCookie);
 
     assertThat(logout.statusCode()).isEqualTo(204);
     assertThat(
             jdbcTemplate.queryForObject(
-                "select count(*) from identity_authentication_sessions where revoked_at is not null",
-                Integer.class))
+                "select count(*) from identity_authentication_sessions "
+                    + "where account_id = ? and revoked_at is not null",
+                Integer.class,
+                accountId))
         .isEqualTo(1);
     assertThat(
             jdbcTemplate.queryForObject(
-                "select count(*) from identity_authentication_sessions where revoked_at is null",
-                Integer.class))
+                "select count(*) from identity_authentication_sessions "
+                    + "where account_id = ? and revoked_at is null",
+                Integer.class,
+                accountId))
         .isEqualTo(1);
 
     HttpResponse<String> csrfAfterLogout = csrf();
     HttpResponse<String> repeatedLogout =
         logout(
             objectMapper.readTree(csrfAfterLogout.body()).path("token").asText(),
-            cookieValue(csrfAfterLogout, "XSRF-TOKEN"),
+            cookieValue(csrfAfterLogout, "JSESSIONID"),
             sessionCookie);
 
     assertThat(repeatedLogout.statusCode()).isEqualTo(204);
@@ -166,7 +170,7 @@ class OrionTaskApplicationTest {
     HttpResponse<String> logoutWithoutSession =
         logout(
             objectMapper.readTree(csrfWithoutSession.body()).path("token").asText(),
-            cookieValue(csrfWithoutSession, "XSRF-TOKEN"),
+            cookieValue(csrfWithoutSession, "JSESSIONID"),
             "");
     assertThat(logoutWithoutSession.statusCode()).isEqualTo(204);
   }
@@ -176,14 +180,14 @@ class OrionTaskApplicationTest {
   void limitsLoginAttemptsByOriginWithRetryAfter() throws Exception {
     HttpResponse<String> csrf = csrf();
     String csrfToken = objectMapper.readTree(csrf.body()).path("token").asText();
-    String csrfCookie = cookieValue(csrf, "XSRF-TOKEN");
+    String csrfSession = cookieValue(csrf, "JSESSIONID");
 
     for (int index = 0; index < 20; index++) {
       HttpResponse<String> response =
           login(
               Map.of("email", "unknown" + index + "@example.com", "password", "incorrect-password"),
               csrfToken,
-              csrfCookie);
+              csrfSession);
       assertThat(response.statusCode()).isEqualTo(401);
     }
 
@@ -191,10 +195,191 @@ class OrionTaskApplicationTest {
         login(
             Map.of("email", "unknown-extra@example.com", "password", "incorrect-password"),
             csrfToken,
-            csrfCookie);
+            csrfSession);
 
     assertThat(blocked.statusCode()).isEqualTo(429);
     assertThat(blocked.headers().firstValue("Retry-After")).hasValue("900");
+  }
+
+  @Test
+  @DirtiesContext(methodMode = DirtiesContext.MethodMode.BEFORE_METHOD)
+  void rejectsMissingInvalidAndPreviousCsrfTokens() throws Exception {
+    String email = "csrf@example.com";
+    String password = "long-password-7";
+    createAccount(email, password);
+
+    HttpResponse<String> initialCsrf = csrf();
+    String initialToken = csrfToken(initialCsrf);
+    String initialTechnicalSession = cookieValue(initialCsrf, "JSESSIONID");
+
+    assertThat(
+            loginWithoutCsrf(Map.of("email", email, "password", password), initialTechnicalSession)
+                .statusCode())
+        .isEqualTo(403);
+
+    HttpResponse<String> invalidCsrf = csrf();
+    assertThat(
+            login(
+                    Map.of("email", email, "password", password),
+                    "invalid-csrf-token",
+                    cookieValue(invalidCsrf, "JSESSIONID"))
+                .statusCode())
+        .isEqualTo(403);
+
+    HttpResponse<String> loginCsrf = csrf();
+    HttpResponse<String> login =
+        login(
+            Map.of("email", email, "password", password),
+            csrfToken(loginCsrf),
+            cookieValue(loginCsrf, "JSESSIONID"));
+    assertThat(login.statusCode()).isEqualTo(204);
+
+    assertThat(
+            login(
+                    Map.of("email", email, "password", password),
+                    initialToken,
+                    initialTechnicalSession)
+                .statusCode())
+        .isEqualTo(403);
+
+    HttpResponse<String> logoutCsrf = csrf();
+    HttpResponse<String> logout =
+        logout(
+            csrfToken(logoutCsrf),
+            cookieValue(logoutCsrf, "JSESSIONID"),
+            cookieValue(login, "__Host-oriontask-session"));
+    assertThat(logout.statusCode()).isEqualTo(204);
+
+    assertThat(
+            login(
+                    Map.of("email", email, "password", password),
+                    csrfToken(logoutCsrf),
+                    cookieValue(logoutCsrf, "JSESSIONID"))
+                .statusCode())
+        .isEqualTo(403);
+  }
+
+  @Test
+  @DirtiesContext(methodMode = DirtiesContext.MethodMode.BEFORE_METHOD)
+  void rotatesTechnicalSessionAndInvalidatesCsrfTokenAfterLogin() throws Exception {
+    String email = "rotation@example.com";
+    String password = "long-password-rotation";
+    createAccount(email, password);
+
+    HttpResponse<String> initialCsrf = csrf();
+    String initialToken = csrfToken(initialCsrf);
+    String initialTechnicalSession = cookieValue(initialCsrf, "JSESSIONID");
+    assertThat(
+            initialCsrf.headers().allValues("Set-Cookie").stream()
+                .filter(value -> value.startsWith("JSESSIONID="))
+                .findFirst()
+                .orElseThrow())
+        .contains("HttpOnly", "Secure", "SameSite=Lax", "Path=/")
+        .doesNotContain("Domain=");
+
+    HttpResponse<String> login =
+        login(Map.of("email", email, "password", password), initialToken, initialTechnicalSession);
+    String rotatedTechnicalSession = cookieValue(login, "JSESSIONID");
+
+    assertThat(login.statusCode()).isEqualTo(204);
+    assertThat(rotatedTechnicalSession).isNotEqualTo(initialTechnicalSession);
+    assertThat(
+            login(
+                    Map.of("email", email, "password", password),
+                    initialToken,
+                    initialTechnicalSession)
+                .statusCode())
+        .isEqualTo(403);
+
+    HttpResponse<String> refreshedCsrf = csrf(rotatedTechnicalSession);
+    assertThat(
+            login(
+                    Map.of("email", email, "password", password),
+                    csrfToken(refreshedCsrf),
+                    rotatedTechnicalSession)
+                .statusCode())
+        .isEqualTo(204);
+  }
+
+  @Test
+  @DirtiesContext(methodMode = DirtiesContext.MethodMode.BEFORE_METHOD)
+  void logoutDoesNotRevealUnknownOrExpiredSessions() throws Exception {
+    String email = "expired@example.com";
+    String password = "long-password-8";
+    createAccount(email, password);
+
+    HttpResponse<String> unknownCsrf = csrf();
+    assertThat(
+            logout(
+                    csrfToken(unknownCsrf),
+                    cookieValue(unknownCsrf, "JSESSIONID"),
+                    "unknown-session-token")
+                .statusCode())
+        .isEqualTo(204);
+
+    HttpResponse<String> loginCsrf = csrf();
+    HttpResponse<String> login =
+        login(
+            Map.of("email", email, "password", password),
+            csrfToken(loginCsrf),
+            cookieValue(loginCsrf, "JSESSIONID"));
+    String sessionToken = cookieValue(login, "__Host-oriontask-session");
+    jdbcTemplate.update(
+        "update identity_authentication_sessions set absolute_expires_at = current_timestamp - interval '1 second'");
+
+    HttpResponse<String> expiredCsrf = csrf();
+    assertThat(
+            logout(csrfToken(expiredCsrf), cookieValue(expiredCsrf, "JSESSIONID"), sessionToken)
+                .statusCode())
+        .isEqualTo(204);
+  }
+
+  @Test
+  @DirtiesContext(methodMode = DirtiesContext.MethodMode.BEFORE_METHOD)
+  void logoutOfOneAccountSessionDoesNotRevokeAnotherAccountSession() throws Exception {
+    String firstEmail = "first@example.com";
+    String secondEmail = "second@example.com";
+    String password = "long-password-9";
+    UUID firstAccountId = createAccount(firstEmail, password);
+    UUID secondAccountId = createAccount(secondEmail, password);
+
+    HttpResponse<String> firstCsrf = csrf();
+    HttpResponse<String> firstLogin =
+        login(
+            Map.of("email", firstEmail, "password", password),
+            csrfToken(firstCsrf),
+            cookieValue(firstCsrf, "JSESSIONID"));
+    HttpResponse<String> secondCsrf = csrf();
+    HttpResponse<String> secondLogin =
+        login(
+            Map.of("email", secondEmail, "password", password),
+            csrfToken(secondCsrf),
+            cookieValue(secondCsrf, "JSESSIONID"));
+
+    HttpResponse<String> logoutCsrf = csrf();
+    assertThat(
+            logout(
+                    csrfToken(logoutCsrf),
+                    cookieValue(logoutCsrf, "JSESSIONID"),
+                    cookieValue(firstLogin, "__Host-oriontask-session"))
+                .statusCode())
+        .isEqualTo(204);
+
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from identity_authentication_sessions "
+                    + "where account_id = ? and revoked_at is null",
+                Integer.class,
+                firstAccountId))
+        .isZero();
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from identity_authentication_sessions "
+                    + "where account_id = ? and revoked_at is null",
+                Integer.class,
+                secondAccountId))
+        .isEqualTo(1);
+    assertThat(cookieValue(secondLogin, "__Host-oriontask-session")).isNotBlank();
   }
 
   private HttpResponse<String> register(Map<String, String> payload) throws Exception {
@@ -206,6 +391,16 @@ class OrionTaskApplicationTest {
     return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
   }
 
+  private UUID createAccount(String email, String password) {
+    UUID accountId = UUID.randomUUID();
+    jdbcTemplate.update(
+        "insert into identity_accounts (id, normalized_email, password_hash, created_at) values (?, ?, ?, current_timestamp)",
+        accountId,
+        email,
+        passwordHasher.hash(password));
+    return accountId;
+  }
+
   private HttpResponse<String> csrf() throws Exception {
     HttpRequest request =
         HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/csrf"))
@@ -214,27 +409,47 @@ class OrionTaskApplicationTest {
     return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
   }
 
+  private HttpResponse<String> csrf(String technicalSession) throws Exception {
+    HttpRequest request =
+        HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/csrf"))
+            .header("Cookie", "JSESSIONID=" + technicalSession)
+            .GET()
+            .build();
+    return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+  }
+
   private HttpResponse<String> login(
-      Map<String, String> payload, String csrfToken, String csrfCookie) throws Exception {
+      Map<String, String> payload, String csrfToken, String csrfSession) throws Exception {
     HttpRequest request =
         HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/sessions"))
             .header("Content-Type", "application/json")
-            .header("X-XSRF-TOKEN", csrfToken)
-            .header("Cookie", "XSRF-TOKEN=" + csrfCookie)
+            .header("X-CSRF-TOKEN", csrfToken)
+            .header("Cookie", "JSESSIONID=" + csrfSession)
             .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)))
             .build();
     return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
   }
 
-  private HttpResponse<String> logout(String csrfToken, String csrfCookie, String sessionCookie)
+  private HttpResponse<String> loginWithoutCsrf(Map<String, String> payload, String csrfSession)
+      throws Exception {
+    HttpRequest request =
+        HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/sessions"))
+            .header("Content-Type", "application/json")
+            .header("Cookie", "JSESSIONID=" + csrfSession)
+            .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)))
+            .build();
+    return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+  }
+
+  private HttpResponse<String> logout(String csrfToken, String csrfSession, String sessionCookie)
       throws Exception {
     HttpRequest request =
         HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/session"))
-            .header("X-XSRF-TOKEN", csrfToken)
+            .header("X-CSRF-TOKEN", csrfToken)
             .header(
                 "Cookie",
-                "XSRF-TOKEN="
-                    + csrfCookie
+                "JSESSIONID="
+                    + csrfSession
                     + (sessionCookie.isEmpty()
                         ? ""
                         : "; __Host-oriontask-session=" + sessionCookie))
@@ -249,5 +464,9 @@ class OrionTaskApplicationTest {
         .map(value -> value.substring(name.length() + 1, value.indexOf(';')))
         .findFirst()
         .orElseThrow();
+  }
+
+  private String csrfToken(HttpResponse<String> response) throws Exception {
+    return objectMapper.readTree(response.body()).path("token").asText();
   }
 }

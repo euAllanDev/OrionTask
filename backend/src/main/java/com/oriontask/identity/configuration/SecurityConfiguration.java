@@ -5,20 +5,22 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
-import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.access.AccessDeniedHandlerImpl;
 import org.springframework.security.web.authentication.AnonymousAuthenticationFilter;
-import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.context.NullSecurityContextRepository;
 import org.springframework.security.web.csrf.CsrfException;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
+import org.springframework.security.web.csrf.HttpSessionCsrfTokenRepository;
 
 @Configuration
 class SecurityConfiguration {
   @Bean
   CsrfTokenRepository csrfTokenRepository() {
-    return CookieCsrfTokenRepository.withHttpOnlyFalse();
+    HttpSessionCsrfTokenRepository repository = new HttpSessionCsrfTokenRepository();
+    repository.setHeaderName("X-CSRF-TOKEN");
+    return repository;
   }
 
   @Bean
@@ -43,8 +45,8 @@ class SecurityConfiguration {
             csrf ->
                 csrf.csrfTokenRepository(csrfTokenRepository)
                     .ignoringRequestMatchers("/api/v1/accounts"))
-        .sessionManagement(
-            sessions -> sessions.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+        .securityContext(
+            context -> context.securityContextRepository(new NullSecurityContextRepository()))
         .httpBasic(AbstractHttpConfigurer::disable)
         .formLogin(AbstractHttpConfigurer::disable)
         .exceptionHandling(exception -> exception.accessDeniedHandler(csrfAccessDeniedHandler))

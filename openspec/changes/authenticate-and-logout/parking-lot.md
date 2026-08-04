@@ -9,3 +9,4 @@ Itens relacionados, mas fora do escopo proposto:
 - dispositivos confiáveis;
 - gestão de sessões em múltiplos dispositivos;
 - notificações de segurança por e-mail.
+- afinidade de sessão ou armazenamento compartilhado do estado técnico de CSRF antes de múltiplas réplicas da aplicação.

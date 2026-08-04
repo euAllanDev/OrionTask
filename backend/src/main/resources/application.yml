@@ -23,6 +23,14 @@ management:
         enabled: false
 
 server:
+  servlet:
+    session:
+      timeout: 30m
+      cookie:
+        http-only: true
+        secure: true
+        same-site: lax
+        path: /
   error:
     include-binding-errors: never
     include-message: never

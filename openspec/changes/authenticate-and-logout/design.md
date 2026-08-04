@@ -8,6 +8,12 @@ A autenticação não utilizará a HttpSession como fonte da identidade. A ident
 
 O estado técnico de CSRF tem ciclo de vida separado da sessão de autenticação. Ele pode exigir estado próprio do Spring Security, mas não cria um segundo mecanismo de autenticação e deve ser renovado após login, logout, invalidação ou rejeição do token CSRF.
 
+O estado técnico de CSRF usa `HttpSession` local, identificado por `JSESSIONID`, somente para armazenar o token CSRF. Ele não armazena nem recupera o contexto autenticado. O cookie técnico deve usar `HttpOnly`, `Secure`, `SameSite=Lax` e `Path=/`, sem `Domain`, e a sessão técnica expira após trinta minutos. No perfil local, `Secure` pode ser desabilitado somente para desenvolvimento HTTP sem TLS; produção deve usá-lo obrigatoriamente.
+
+A expiração ou invalidação da sessão técnica não revoga a sessão persistida do OrionTask. Nesse caso, o cliente obtém novo token em `GET /api/v1/csrf`. Após login, o identificador da sessão técnica é rotacionado; após logout, ela é invalidada.
+
+A implantação inicial usa uma única instância da aplicação. Antes de múltiplas réplicas, uma change operacional deve decidir entre afinidade de sessão e armazenamento compartilhado para o estado técnico de CSRF. Redis ou Spring Session não serão introduzidos antecipadamente nesta change.
+
 ## Sessão e token de autenticação
 
 - cada login bem-sucedido cria novo token opaco, nova sessão persistida e novo contexto autenticado;

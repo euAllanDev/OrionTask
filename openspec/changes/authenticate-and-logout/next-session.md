@@ -2,7 +2,7 @@
 
 ## Estado atual
 
-A change `authenticate-and-logout` foi aprovada para implementação em 2026-08-04. A implementação inicial de autenticação, sessão persistida, CSRF, logout e migration foi concluída e validada por `backend/mvnw.cmd verify` com PostgreSQL/Testcontainers.
+A change `authenticate-and-logout` foi aprovada para implementação em 2026-08-04. A implementação de autenticação, sessão persistida, CSRF, logout e migration foi concluída e validada por `backend/mvnw.cmd verify` com PostgreSQL/Testcontainers.
 
 ## Decisões aprovadas
 
@@ -15,6 +15,6 @@ A change `authenticate-and-logout` foi aprovada para implementação em 2026-08-
 - logout idempotente da sessão atual;
 - revogação global permanece fora do escopo.
 
-## Próximo passo
+## Conclusão
 
-Cobrir os cenários de segurança restantes em `tasks.md`, revisar a implementação e realizar revisão humana antes do archive, sem incluir organização, membership, papéis, alteração ou recuperação de senha, alteração de e-mail, MFA ou revogação global.
+A revisão humana final foi aprovada em 2026-08-04. A change foi concluída sem incluir organização, membership, papéis, alteração ou recuperação de senha, alteração de e-mail, MFA ou revogação global.
