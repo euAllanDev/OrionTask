@@ -2,6 +2,7 @@ package com.oriontask.identity.adapter.out.persistence;
 
 import com.oriontask.identity.application.port.out.AccountStore;
 import com.oriontask.identity.domain.model.Account;
+import java.util.Optional;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 
@@ -29,5 +30,10 @@ class JpaAccountStore implements AccountStore {
     } catch (DataIntegrityViolationException exception) {
       return false;
     }
+  }
+
+  @Override
+  public Optional<Account> findByNormalizedEmail(String normalizedEmail) {
+    return repository.findByNormalizedEmail(normalizedEmail).map(AccountJpaEntity::toDomain);
   }
 }

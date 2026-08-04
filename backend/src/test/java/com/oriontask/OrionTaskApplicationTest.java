@@ -2,11 +2,13 @@ package com.oriontask;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.oriontask.identity.application.port.out.PasswordHasher;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.Map;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -18,7 +20,10 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(
+    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+    properties =
+        "oriontask.security.session-hmac-key=VGhpcy1pcy1hLXRlc3QtaG1hYy1rZXktd2l0aC0zMi1ieXRlcy0xMjM0NTY=")
 @Testcontainers
 class OrionTaskApplicationTest {
 
@@ -28,6 +33,8 @@ class OrionTaskApplicationTest {
   @LocalServerPort private int port;
 
   @org.springframework.beans.factory.annotation.Autowired private JdbcTemplate jdbcTemplate;
+
+  @org.springframework.beans.factory.annotation.Autowired private PasswordHasher passwordHasher;
 
   private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -90,6 +97,48 @@ class OrionTaskApplicationTest {
         .isEqualTo(429);
   }
 
+  @Test
+  void authenticationUsesCsrfAndPersistsOnlySessionTokenDerivation() throws Exception {
+    String email = "login@example.com";
+    String password = "long-password-6";
+    jdbcTemplate.update(
+        "insert into identity_accounts (id, normalized_email, password_hash, created_at) values (?, ?, ?, current_timestamp)",
+        UUID.randomUUID(),
+        email,
+        passwordHasher.hash(password));
+
+    HttpResponse<String> csrf = csrf();
+    String csrfToken = objectMapper.readTree(csrf.body()).path("token").asText();
+    String csrfCookie = cookieValue(csrf, "XSRF-TOKEN");
+    HttpResponse<String> login =
+        login(Map.of("email", email, "password", password), csrfToken, csrfCookie);
+
+    assertThat(login.statusCode()).isEqualTo(204);
+    String sessionCookie = cookieValue(login, "__Host-oriontask-session");
+    assertThat(sessionCookie).isNotBlank();
+    assertThat(login.headers().allValues("Set-Cookie").getFirst())
+        .contains("Secure", "HttpOnly", "SameSite=Lax", "Path=/")
+        .doesNotContain("Domain=");
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select token_derivation from identity_authentication_sessions", String.class))
+        .doesNotContain(sessionCookie);
+
+    HttpResponse<String> renewedCsrf = csrf();
+    HttpResponse<String> logout =
+        logout(
+            objectMapper.readTree(renewedCsrf.body()).path("token").asText(),
+            cookieValue(renewedCsrf, "XSRF-TOKEN"),
+            sessionCookie);
+
+    assertThat(logout.statusCode()).isEqualTo(204);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select revoked_at is not null from identity_authentication_sessions",
+                Boolean.class))
+        .isTrue();
+  }
+
   private HttpResponse<String> register(Map<String, String> payload) throws Exception {
     HttpRequest request =
         HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/accounts"))
@@ -97,5 +146,46 @@ class OrionTaskApplicationTest {
             .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)))
             .build();
     return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+  }
+
+  private HttpResponse<String> csrf() throws Exception {
+    HttpRequest request =
+        HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/csrf"))
+            .GET()
+            .build();
+    return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+  }
+
+  private HttpResponse<String> login(
+      Map<String, String> payload, String csrfToken, String csrfCookie) throws Exception {
+    HttpRequest request =
+        HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/sessions"))
+            .header("Content-Type", "application/json")
+            .header("X-XSRF-TOKEN", csrfToken)
+            .header("Cookie", "XSRF-TOKEN=" + csrfCookie)
+            .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)))
+            .build();
+    return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+  }
+
+  private HttpResponse<String> logout(String csrfToken, String csrfCookie, String sessionCookie)
+      throws Exception {
+    HttpRequest request =
+        HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/session"))
+            .header("X-XSRF-TOKEN", csrfToken)
+            .header(
+                "Cookie",
+                "XSRF-TOKEN=" + csrfCookie + "; __Host-oriontask-session=" + sessionCookie)
+            .DELETE()
+            .build();
+    return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+  }
+
+  private static String cookieValue(HttpResponse<String> response, String name) {
+    return response.headers().allValues("Set-Cookie").stream()
+        .filter(value -> value.startsWith(name + "="))
+        .map(value -> value.substring(name.length() + 1, value.indexOf(';')))
+        .findFirst()
+        .orElseThrow();
   }
 }

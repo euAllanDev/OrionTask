@@ -1,5 +1,6 @@
 package com.oriontask.identity.adapter.out.persistence;
 
+import com.oriontask.identity.domain.model.Account;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -28,5 +29,9 @@ class AccountJpaEntity {
     this.normalizedEmail = normalizedEmail;
     this.passwordHash = passwordHash;
     this.createdAt = createdAt;
+  }
+
+  Account toDomain() {
+    return new Account(id, normalizedEmail, passwordHash, createdAt);
   }
 }

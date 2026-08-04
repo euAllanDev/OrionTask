@@ -38,16 +38,16 @@ A fundação técnica e a criação de conta interna foram concluídas e arquiva
 
 ## Change ativa
 
-Nenhuma. A próxima capacidade deve iniciar uma nova change OpenSpec aprovada.
+`authenticate-and-logout` está em implementação. A change foi aprovada e ainda requer cenários de teste pendentes e revisão humana antes do archive.
 
 ## Execução local
 
 Pré-requisitos: Java 21 e Docker Desktop em execução.
 
-1. Copie `.env.example` para `.env` e ajuste somente os valores locais, se necessário.
+1. Copie `.env.example` para `.env`, gere `ORIONTASK_SESSION_HMAC_KEY` com ao menos 32 bytes e ajuste somente os valores locais, se necessário.
 2. Execute `docker compose --env-file ../.env up -d` em `backend/` para iniciar o PostgreSQL.
 3. Execute `mvnw.cmd verify` no Windows ou `./mvnw verify` em ambientes POSIX, também em `backend/`.
 4. Execute `mvnw.cmd spring-boot:run` no Windows ou `./mvnw spring-boot:run` em ambientes POSIX.
 5. Consulte `http://localhost:8080/actuator/health`.
 
-Os endpoints atuais são `/actuator/health` e `POST /api/v1/accounts`.
+Os endpoints atuais são `/actuator/health`, `POST /api/v1/accounts`, `GET /api/v1/csrf`, `POST /api/v1/sessions` e `DELETE /api/v1/session`.

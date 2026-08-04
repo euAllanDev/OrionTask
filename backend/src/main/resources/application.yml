@@ -27,3 +27,8 @@ server:
     include-binding-errors: never
     include-message: never
     include-stacktrace: never
+
+oriontask:
+  security:
+    session-hmac-key: ${ORIONTASK_SESSION_HMAC_KEY}
+    trusted-proxies: ${ORIONTASK_TRUSTED_PROXIES:}
