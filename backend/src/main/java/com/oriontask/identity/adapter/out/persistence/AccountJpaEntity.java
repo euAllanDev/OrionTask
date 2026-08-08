@@ -34,4 +34,8 @@ class AccountJpaEntity {
   Account toDomain() {
     return new Account(id, normalizedEmail, passwordHash, createdAt);
   }
+
+  UUID id() {
+    return id;
+  }
 }

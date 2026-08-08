@@ -5,11 +5,12 @@
 - A criação de conta e a autenticação com encerramento de sessão estão concluídas e arquivadas.
 - A criação de organização foi arquivada; especificação canônica em `openspec/specs/organization-creation/spec.md`.
 - `organization-access` foi arquivada; especificação canônica em `openspec/specs/organization-access/spec.md`.
+- `invite-member` foi arquivada; especificacao canonica em `openspec/specs/membership-invitation/spec.md`.
 - A especificação canônica de autenticação está em `openspec/specs/session-authentication/spec.md`.
 
 ## Próximo ponto de partida
 
-Iniciar exploração e proposal para convites de usuários. Não implementar código antes de aprovar os artefatos OpenSpec.
+Iniciar exploracao e proposal para revogacao de acesso. Nao implementar codigo antes de aprovar os artefatos OpenSpec.
 
 ## Decisões implementadas
 

@@ -39,4 +39,5 @@ server:
 oriontask:
   security:
     session-hmac-key: ${ORIONTASK_SESSION_HMAC_KEY}
+    invitation-hmac-key: ${ORIONTASK_INVITATION_HMAC_KEY:${oriontask.security.session-hmac-key}}
     trusted-proxies: ${ORIONTASK_TRUSTED_PROXIES:}

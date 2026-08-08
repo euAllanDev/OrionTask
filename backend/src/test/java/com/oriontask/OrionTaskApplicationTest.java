@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.oriontask.identity.application.port.out.PasswordHasher;
+import com.oriontask.organization.application.port.in.AcceptMembershipInvitationCommand;
+import com.oriontask.organization.application.port.in.AcceptMembershipInvitationUseCase;
 import com.oriontask.organization.application.port.out.OrganizationStore;
 import com.oriontask.organization.domain.model.Membership;
 import com.oriontask.organization.domain.model.Organization;
@@ -14,6 +16,9 @@ import java.net.http.HttpResponse;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -46,6 +51,9 @@ class OrionTaskApplicationTest {
 
   @org.springframework.beans.factory.annotation.Autowired
   private OrganizationStore organizationStore;
+
+  @org.springframework.beans.factory.annotation.Autowired
+  private AcceptMembershipInvitationUseCase acceptMembershipInvitationUseCase;
 
   private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -571,6 +579,114 @@ class OrionTaskApplicationTest {
     assertThat(anonymousResponse.statusCode()).isEqualTo(403);
   }
 
+  @Test
+  @DirtiesContext(methodMode = DirtiesContext.MethodMode.BEFORE_METHOD)
+  void invitationsAuthorizeCreatorHideRecipientsAndCreateMembershipOnAcceptance() throws Exception {
+    String password = "long-password-membership-invitation";
+    UUID recipientId = createAccount("invite-recipient@example.com", password);
+    createAccount("invite-outsider@example.com", password);
+    UUID ownerId = createAccount("invite-owner@example.com", password);
+    HttpResponse<String> ownerLogin = authenticatedLogin("invite-owner@example.com", password);
+    UUID organizationId = createOrganizationForSession(ownerLogin, "Invitation Organization");
+    String ownerTechnicalSession = cookieValue(ownerLogin, "JSESSIONID");
+    HttpResponse<String> ownerCsrf = csrf(ownerTechnicalSession);
+
+    HttpResponse<String> created =
+        createInvitation(
+            organizationId,
+            Map.of("recipientEmail", "invite-recipient@example.com", "role", "TECHNICIAN"),
+            csrfToken(ownerCsrf),
+            ownerTechnicalSession,
+            cookieValue(ownerLogin, "__Host-oriontask-session"));
+    String token = objectMapper.readTree(created.body()).path("token").asText();
+    HttpResponse<String> coverage =
+        createInvitation(
+            organizationId,
+            Map.of("recipientEmail", "missing@example.com", "role", "TECHNICIAN"),
+            csrfToken(csrf(ownerTechnicalSession)),
+            ownerTechnicalSession,
+            cookieValue(ownerLogin, "__Host-oriontask-session"));
+
+    HttpResponse<String> recipientLogin =
+        authenticatedLogin("invite-recipient@example.com", password);
+    String recipientTechnicalSession = cookieValue(recipientLogin, "JSESSIONID");
+    HttpResponse<String> accepted =
+        acceptInvitation(
+            token,
+            csrfToken(csrf(recipientTechnicalSession)),
+            recipientTechnicalSession,
+            cookieValue(recipientLogin, "__Host-oriontask-session"));
+
+    assertThat(ownerId).isNotNull();
+    assertThat(created.statusCode()).isEqualTo(202);
+    assertThat(token).hasSize(43);
+    assertThat(coverage.statusCode()).isEqualTo(202);
+    assertThat(objectMapper.readTree(coverage.body()).path("token").asText()).hasSize(43);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select token_derivation from membership_invitations where recipient_account_id = ?",
+                String.class,
+                recipientId))
+        .doesNotContain(token);
+    assertThat(accepted.statusCode()).isEqualTo(201);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from organization_memberships where organization_id = ? and account_id = ? "
+                    + "and role = 'TECHNICIAN'",
+                Integer.class,
+                organizationId,
+                recipientId))
+        .isEqualTo(1);
+  }
+
+  @Test
+  @DirtiesContext(methodMode = DirtiesContext.MethodMode.BEFORE_METHOD)
+  void concurrentInvitationAcceptanceCreatesOnlyOneMembership() throws Exception {
+    String password = "long-password-concurrent-invitation";
+    UUID recipientId = createAccount("concurrent-recipient@example.com", password);
+    createAccount("concurrent-owner@example.com", password);
+    HttpResponse<String> ownerLogin = authenticatedLogin("concurrent-owner@example.com", password);
+    UUID organizationId =
+        createOrganizationForSession(ownerLogin, "Concurrent Invitation Organization");
+    String technicalSession = cookieValue(ownerLogin, "JSESSIONID");
+    HttpResponse<String> created =
+        createInvitation(
+            organizationId,
+            Map.of("recipientEmail", "concurrent-recipient@example.com", "role", "TECHNICIAN"),
+            csrfToken(csrf(technicalSession)),
+            technicalSession,
+            cookieValue(ownerLogin, "__Host-oriontask-session"));
+    String token = objectMapper.readTree(created.body()).path("token").asText();
+
+    Callable<Boolean> accept =
+        () ->
+            acceptMembershipInvitationUseCase
+                .accept(new AcceptMembershipInvitationCommand(token, recipientId))
+                .isPresent();
+    try (ExecutorService executor = Executors.newFixedThreadPool(2)) {
+      long accepted =
+          executor.invokeAll(java.util.List.of(accept, accept)).stream()
+              .filter(
+                  future -> {
+                    try {
+                      return future.get();
+                    } catch (Exception exception) {
+                      throw new AssertionError(exception);
+                    }
+                  })
+              .count();
+      assertThat(accepted).isEqualTo(1);
+    }
+
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from organization_memberships where organization_id = ? and account_id = ?",
+                Integer.class,
+                organizationId,
+                recipientId))
+        .isEqualTo(1);
+  }
+
   private HttpResponse<String> register(Map<String, String> payload) throws Exception {
     HttpRequest request =
         HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/accounts"))
@@ -651,6 +767,51 @@ class OrionTaskApplicationTest {
                 "Cookie",
                 "JSESSIONID=" + technicalSession + "; __Host-oriontask-session=" + sessionToken)
             .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)))
+            .build();
+    return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+  }
+
+  private HttpResponse<String> createInvitation(
+      UUID organizationId,
+      Map<String, String> payload,
+      String csrfToken,
+      String technicalSession,
+      String sessionToken)
+      throws Exception {
+    HttpRequest request =
+        HttpRequest.newBuilder(
+                URI.create(
+                    "http://localhost:"
+                        + port
+                        + "/api/v1/organizations/"
+                        + organizationId
+                        + "/invitations"))
+            .header("Content-Type", "application/json")
+            .header("X-CSRF-TOKEN", csrfToken)
+            .header(
+                "Cookie",
+                "JSESSIONID=" + technicalSession + "; __Host-oriontask-session=" + sessionToken)
+            .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)))
+            .build();
+    return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+  }
+
+  private HttpResponse<String> acceptInvitation(
+      String token, String csrfToken, String technicalSession, String sessionToken)
+      throws Exception {
+    HttpRequest request =
+        HttpRequest.newBuilder(
+                URI.create(
+                    "http://localhost:"
+                        + port
+                        + "/api/v1/membership-invitations/"
+                        + token
+                        + "/accept"))
+            .header("X-CSRF-TOKEN", csrfToken)
+            .header(
+                "Cookie",
+                "JSESSIONID=" + technicalSession + "; __Host-oriontask-session=" + sessionToken)
+            .POST(HttpRequest.BodyPublishers.noBody())
             .build();
     return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
   }

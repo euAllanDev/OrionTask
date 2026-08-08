@@ -38,4 +38,8 @@ class MembershipJpaEntity {
     createdAt = membership.createdAt();
     updatedAt = membership.updatedAt();
   }
+
+  Membership.Role role() {
+    return Membership.Role.valueOf(role);
+  }
 }

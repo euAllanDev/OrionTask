@@ -15,7 +15,7 @@ Este repositório será desenvolvido com:
 
 ## Estado atual
 
-A fundação técnica, a criação de conta interna, a autenticação por sessão, a criação de organização e o acesso organizacional foram concluídos e arquivados localmente. A abertura de pull requests e a validação remota do CI permanecem adiadas por decisão do responsável.
+A fundação técnica, a criação de conta interna, a autenticação por sessão, a criação de organização, o acesso organizacional e os convites de usuários foram concluídos e arquivados localmente. A abertura de pull requests e a validação remota do CI permanecem adiadas por decisão do responsável.
 
 ## Documentos fundamentais
 
@@ -38,7 +38,7 @@ A fundação técnica, a criação de conta interna, a autenticação por sessã
 
 ## Change ativa
 
-Não há change OpenSpec ativa.
+`invite-member` está especificada. Implementação bloqueada até aprovação humana de proposal, design, delta spec e tarefas.
 
 ## Execução local
 
