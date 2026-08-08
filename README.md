@@ -15,7 +15,7 @@ Este repositório será desenvolvido com:
 
 ## Estado atual
 
-A fundação técnica e a criação de conta interna foram concluídas e arquivadas localmente. A abertura de pull requests e a validação remota do CI permanecem adiadas por decisão do responsável.
+A fundação técnica, a criação de conta interna, a autenticação por sessão e a criação de organização foram concluídas e arquivadas localmente. A abertura de pull requests e a validação remota do CI permanecem adiadas por decisão do responsável.
 
 ## Documentos fundamentais
 
@@ -38,7 +38,7 @@ A fundação técnica e a criação de conta interna foram concluídas e arquiva
 
 ## Change ativa
 
-`authenticate-and-logout` está em implementação. A change foi aprovada e ainda requer cenários de teste pendentes e revisão humana antes do archive.
+Não há change OpenSpec ativa.
 
 ## Execução local
 
@@ -50,4 +50,4 @@ Pré-requisitos: Java 21 e Docker Desktop em execução.
 4. Execute `mvnw.cmd spring-boot:run` no Windows ou `./mvnw spring-boot:run` em ambientes POSIX.
 5. Consulte `http://localhost:8080/actuator/health`.
 
-Os endpoints atuais são `/actuator/health`, `POST /api/v1/accounts`, `GET /api/v1/csrf`, `POST /api/v1/sessions` e `DELETE /api/v1/session`.
+Os endpoints atuais são `/actuator/health`, `POST /api/v1/accounts`, `GET /api/v1/csrf`, `POST /api/v1/sessions`, `DELETE /api/v1/session` e `POST /api/v1/organizations`.

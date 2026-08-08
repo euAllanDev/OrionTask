@@ -16,7 +16,7 @@ Este roadmap é vivo. Cada item funcional deve ser executado como uma change Ope
 
 - [x] Criação de conta
 - [x] Autenticação e encerramento de sessão
-- [ ] Criação de organização
+- [x] Criação de organização
 - [ ] Membership e papéis
 - [ ] Convites de usuários
 - [ ] Revogação de acesso

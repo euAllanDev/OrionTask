@@ -1,12 +1,17 @@
 package com.oriontask;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.oriontask.identity.application.port.out.PasswordHasher;
+import com.oriontask.organization.application.port.out.OrganizationStore;
+import com.oriontask.organization.domain.model.Membership;
+import com.oriontask.organization.domain.model.Organization;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -38,6 +43,9 @@ class OrionTaskApplicationTest {
   @org.springframework.beans.factory.annotation.Autowired private JdbcTemplate jdbcTemplate;
 
   @org.springframework.beans.factory.annotation.Autowired private PasswordHasher passwordHasher;
+
+  @org.springframework.beans.factory.annotation.Autowired
+  private OrganizationStore organizationStore;
 
   private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -382,6 +390,132 @@ class OrionTaskApplicationTest {
     assertThat(cookieValue(secondLogin, "__Host-oriontask-session")).isNotBlank();
   }
 
+  @Test
+  @DirtiesContext(methodMode = DirtiesContext.MethodMode.BEFORE_METHOD)
+  void organizationCreationUsesSessionIdentityAndCreatesOwnerMembership() throws Exception {
+    String password = "long-password-organization";
+    UUID firstAccountId = createAccount("organization-first@example.com", password);
+    UUID secondAccountId = createAccount("organization-second@example.com", password);
+    HttpResponse<String> firstLogin =
+        authenticatedLogin("organization-first@example.com", password);
+    String firstTechnicalSession = cookieValue(firstLogin, "JSESSIONID");
+    HttpResponse<String> firstCsrf = csrf(firstTechnicalSession);
+
+    HttpResponse<String> firstOrganization =
+        createOrganization(
+            Map.of("name", "  Shared Organization  "),
+            csrfToken(firstCsrf),
+            firstTechnicalSession,
+            cookieValue(firstLogin, "__Host-oriontask-session"));
+
+    assertThat(firstOrganization.statusCode()).isEqualTo(201);
+    JsonNode firstBody = objectMapper.readTree(firstOrganization.body());
+    UUID firstOrganizationId = UUID.fromString(firstBody.path("id").asText());
+    assertThat(firstBody.path("name").asText()).isEqualTo("Shared Organization");
+    assertThat(firstBody.path("createdAt").asText()).isNotBlank();
+    assertThat(firstOrganization.headers().firstValue("Location"))
+        .hasValue("/api/v1/organizations/" + firstOrganizationId);
+
+    HttpResponse<String> secondLogin =
+        authenticatedLogin("organization-second@example.com", password);
+    String secondTechnicalSession = cookieValue(secondLogin, "JSESSIONID");
+    HttpResponse<String> secondCsrf = csrf(secondTechnicalSession);
+    HttpResponse<String> secondOrganization =
+        createOrganization(
+            Map.of("name", "Shared Organization"),
+            csrfToken(secondCsrf),
+            secondTechnicalSession,
+            cookieValue(secondLogin, "__Host-oriontask-session"));
+
+    assertThat(secondOrganization.statusCode()).isEqualTo(201);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from organizations where name = ?",
+                Integer.class,
+                "Shared Organization"))
+        .isEqualTo(2);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from organization_memberships where organization_id = ? "
+                    + "and account_id = ? and role = 'OWNER'",
+                Integer.class,
+                firstOrganizationId,
+                firstAccountId))
+        .isEqualTo(1);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from organization_memberships where organization_id = ? "
+                    + "and account_id = ?",
+                Integer.class,
+                firstOrganizationId,
+                secondAccountId))
+        .isZero();
+    assertThatThrownBy(
+            () ->
+                jdbcTemplate.update(
+                    "insert into organization_memberships "
+                        + "(id, organization_id, account_id, role, created_at, updated_at) "
+                        + "values (?, ?, ?, 'OWNER', current_timestamp, current_timestamp)",
+                    UUID.randomUUID(),
+                    firstOrganizationId,
+                    firstAccountId))
+        .isInstanceOf(Exception.class);
+  }
+
+  @Test
+  void organizationPersistenceRollsBackWhenInitialMembershipCannotBeCreated() {
+    int organizationCountBefore =
+        jdbcTemplate.queryForObject("select count(*) from organizations", Integer.class);
+    Instant now = Instant.now();
+    UUID organizationId = UUID.randomUUID();
+
+    assertThatThrownBy(
+            () ->
+                organizationStore.create(
+                    new Organization(organizationId, "Rollback Organization", now, now),
+                    new Membership(
+                        UUID.randomUUID(),
+                        organizationId,
+                        UUID.randomUUID(),
+                        Membership.Role.OWNER,
+                        now,
+                        now)))
+        .isInstanceOf(Exception.class);
+
+    assertThat(jdbcTemplate.queryForObject("select count(*) from organizations", Integer.class))
+        .isEqualTo(organizationCountBefore);
+  }
+
+  @Test
+  @DirtiesContext(methodMode = DirtiesContext.MethodMode.BEFORE_METHOD)
+  void organizationCreationRejectsInvalidContractsAndCsrf() throws Exception {
+    String password = "long-password-invalid-organization";
+    createAccount("organization-invalid@example.com", password);
+    HttpResponse<String> login = authenticatedLogin("organization-invalid@example.com", password);
+    String technicalSession = cookieValue(login, "JSESSIONID");
+    String sessionToken = cookieValue(login, "__Host-oriontask-session");
+    HttpResponse<String> csrf = csrf(technicalSession);
+    int organizationCountBefore =
+        jdbcTemplate.queryForObject("select count(*) from organizations", Integer.class);
+
+    HttpResponse<String> unexpectedField =
+        createOrganization(
+            Map.of("name", "Valid", "accountId", UUID.randomUUID().toString()),
+            csrfToken(csrf),
+            technicalSession,
+            sessionToken);
+    HttpResponse<String> blankName =
+        createOrganization(Map.of("name", "  "), csrfToken(csrf), technicalSession, sessionToken);
+    HttpResponse<String> missingCsrf =
+        createOrganizationWithoutCsrf(Map.of("name", "Valid"), technicalSession, sessionToken);
+
+    assertThat(unexpectedField.statusCode()).isEqualTo(400);
+    assertThat(blankName.statusCode()).isEqualTo(400);
+    assertThat(missingCsrf.statusCode()).isEqualTo(403);
+    assertThat(jdbcTemplate.queryForObject("select count(*) from organizations", Integer.class))
+        .isEqualTo(organizationCountBefore);
+  }
+
   private HttpResponse<String> register(Map<String, String> payload) throws Exception {
     HttpRequest request =
         HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/accounts"))
@@ -425,6 +559,42 @@ class OrionTaskApplicationTest {
             .header("Content-Type", "application/json")
             .header("X-CSRF-TOKEN", csrfToken)
             .header("Cookie", "JSESSIONID=" + csrfSession)
+            .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)))
+            .build();
+    return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+  }
+
+  private HttpResponse<String> authenticatedLogin(String email, String password) throws Exception {
+    HttpResponse<String> csrf = csrf();
+    return login(
+        Map.of("email", email, "password", password),
+        csrfToken(csrf),
+        cookieValue(csrf, "JSESSIONID"));
+  }
+
+  private HttpResponse<String> createOrganization(
+      Map<String, String> payload, String csrfToken, String technicalSession, String sessionToken)
+      throws Exception {
+    HttpRequest request =
+        HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/organizations"))
+            .header("Content-Type", "application/json")
+            .header("X-CSRF-TOKEN", csrfToken)
+            .header(
+                "Cookie",
+                "JSESSIONID=" + technicalSession + "; __Host-oriontask-session=" + sessionToken)
+            .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)))
+            .build();
+    return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+  }
+
+  private HttpResponse<String> createOrganizationWithoutCsrf(
+      Map<String, String> payload, String technicalSession, String sessionToken) throws Exception {
+    HttpRequest request =
+        HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/organizations"))
+            .header("Content-Type", "application/json")
+            .header(
+                "Cookie",
+                "JSESSIONID=" + technicalSession + "; __Host-oriontask-session=" + sessionToken)
             .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)))
             .build();
     return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
