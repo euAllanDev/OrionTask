@@ -516,6 +516,61 @@ class OrionTaskApplicationTest {
         .isEqualTo(organizationCountBefore);
   }
 
+  @Test
+  @DirtiesContext(methodMode = DirtiesContext.MethodMode.BEFORE_METHOD)
+  void organizationAccessRequiresMembershipAndHidesOrganizationExistence() throws Exception {
+    String password = "long-password-organization-access";
+    UUID ownerAccountId = createAccount("access-owner@example.com", password);
+    UUID adminAccountId = createAccount("access-admin@example.com", password);
+    UUID technicianAccountId = createAccount("access-technician@example.com", password);
+    UUID outsiderAccountId = createAccount("access-outsider@example.com", password);
+    HttpResponse<String> ownerLogin = authenticatedLogin("access-owner@example.com", password);
+    UUID organizationId = createOrganizationForSession(ownerLogin, "Access Organization");
+
+    addMembership(organizationId, adminAccountId, "ADMIN");
+    addMembership(organizationId, technicianAccountId, "TECHNICIAN");
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from organization_memberships where organization_id = ? "
+                    + "and account_id = ? and role = 'OWNER'",
+                Integer.class,
+                organizationId,
+                ownerAccountId))
+        .isEqualTo(1);
+    assertThatThrownBy(() -> addMembership(organizationId, outsiderAccountId, "INVALID"))
+        .isInstanceOf(Exception.class);
+
+    HttpResponse<String> ownerResponse =
+        getOrganization(organizationId, cookieValue(ownerLogin, "__Host-oriontask-session"));
+    HttpResponse<String> adminLogin = authenticatedLogin("access-admin@example.com", password);
+    HttpResponse<String> adminResponse =
+        getOrganization(organizationId, cookieValue(adminLogin, "__Host-oriontask-session"));
+    HttpResponse<String> technicianLogin =
+        authenticatedLogin("access-technician@example.com", password);
+    HttpResponse<String> technicianResponse =
+        getOrganization(organizationId, cookieValue(technicianLogin, "__Host-oriontask-session"));
+    HttpResponse<String> outsiderLogin =
+        authenticatedLogin("access-outsider@example.com", password);
+    HttpResponse<String> outsiderResponse =
+        getOrganization(organizationId, cookieValue(outsiderLogin, "__Host-oriontask-session"));
+    HttpResponse<String> missingResponse =
+        getOrganization(UUID.randomUUID(), cookieValue(ownerLogin, "__Host-oriontask-session"));
+    HttpResponse<String> malformedResponse =
+        getOrganization("not-a-uuid", cookieValue(ownerLogin, "__Host-oriontask-session"));
+    HttpResponse<String> anonymousResponse = getOrganization(organizationId, null);
+
+    assertThat(ownerResponse.statusCode()).isEqualTo(200);
+    assertThat(objectMapper.readTree(ownerResponse.body()).path("name").asText())
+        .isEqualTo("Access Organization");
+    assertThat(adminResponse.statusCode()).isEqualTo(200);
+    assertThat(technicianResponse.statusCode()).isEqualTo(200);
+    assertThat(outsiderResponse.statusCode()).isEqualTo(404);
+    assertThat(missingResponse.statusCode()).isEqualTo(404);
+    assertThat(outsiderResponse.body()).isEqualTo(missingResponse.body());
+    assertThat(malformedResponse.statusCode()).isEqualTo(400);
+    assertThat(anonymousResponse.statusCode()).isEqualTo(403);
+  }
+
   private HttpResponse<String> register(Map<String, String> payload) throws Exception {
     HttpRequest request =
         HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/accounts"))
@@ -598,6 +653,47 @@ class OrionTaskApplicationTest {
             .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)))
             .build();
     return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+  }
+
+  private UUID createOrganizationForSession(HttpResponse<String> login, String name)
+      throws Exception {
+    String technicalSession = cookieValue(login, "JSESSIONID");
+    HttpResponse<String> csrf = csrf(technicalSession);
+    HttpResponse<String> response =
+        createOrganization(
+            Map.of("name", name),
+            csrfToken(csrf),
+            technicalSession,
+            cookieValue(login, "__Host-oriontask-session"));
+    return UUID.fromString(objectMapper.readTree(response.body()).path("id").asText());
+  }
+
+  private void addMembership(UUID organizationId, UUID accountId, String role) {
+    jdbcTemplate.update(
+        "insert into organization_memberships "
+            + "(id, organization_id, account_id, role, created_at, updated_at) "
+            + "values (?, ?, ?, ?, current_timestamp, current_timestamp)",
+        UUID.randomUUID(),
+        organizationId,
+        accountId,
+        role);
+  }
+
+  private HttpResponse<String> getOrganization(UUID organizationId, String sessionToken)
+      throws Exception {
+    return getOrganization(organizationId.toString(), sessionToken);
+  }
+
+  private HttpResponse<String> getOrganization(String organizationId, String sessionToken)
+      throws Exception {
+    HttpRequest.Builder request =
+        HttpRequest.newBuilder(
+                URI.create("http://localhost:" + port + "/api/v1/organizations/" + organizationId))
+            .GET();
+    if (sessionToken != null) {
+      request.header("Cookie", "__Host-oriontask-session=" + sessionToken);
+    }
+    return HttpClient.newHttpClient().send(request.build(), HttpResponse.BodyHandlers.ofString());
   }
 
   private HttpResponse<String> loginWithoutCsrf(Map<String, String> payload, String csrfSession)

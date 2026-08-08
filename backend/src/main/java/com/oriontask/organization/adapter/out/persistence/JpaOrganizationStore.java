@@ -3,6 +3,8 @@ package com.oriontask.organization.adapter.out.persistence;
 import com.oriontask.organization.application.port.out.OrganizationStore;
 import com.oriontask.organization.domain.model.Membership;
 import com.oriontask.organization.domain.model.Organization;
+import java.util.Optional;
+import java.util.UUID;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,5 +25,12 @@ class JpaOrganizationStore implements OrganizationStore {
   public void create(Organization organization, Membership membership) {
     organizationRepository.save(new OrganizationJpaEntity(organization));
     membershipRepository.saveAndFlush(new MembershipJpaEntity(membership));
+  }
+
+  @Override
+  public Optional<Organization> findAuthorized(UUID organizationId, UUID accountId) {
+    return organizationRepository
+        .findAuthorized(organizationId, accountId)
+        .map(OrganizationJpaEntity::toDomain);
   }
 }

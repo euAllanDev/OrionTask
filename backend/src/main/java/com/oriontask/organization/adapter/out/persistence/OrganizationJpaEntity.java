@@ -30,4 +30,8 @@ class OrganizationJpaEntity {
     createdAt = organization.createdAt();
     updatedAt = organization.updatedAt();
   }
+
+  Organization toDomain() {
+    return new Organization(id, name, createdAt, updatedAt);
+  }
 }

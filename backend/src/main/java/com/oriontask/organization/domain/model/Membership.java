@@ -17,6 +17,8 @@ public record Membership(
   }
 
   public enum Role {
-    OWNER
+    OWNER,
+    ADMIN,
+    TECHNICIAN
   }
 }
