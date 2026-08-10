@@ -86,7 +86,7 @@ Direção inicial:
 - proteção CSRF quando aplicável;
 - MFA planejado após a fundação de identidade.
 
-A decisão final será formalizada na change de autenticação.
+A especificação canônica da implementação está em `openspec/specs/session-authentication/spec.md`.
 
 ## Multi-tenancy
 
