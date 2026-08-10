@@ -6,6 +6,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.oriontask.identity.application.port.out.PasswordHasher;
 import com.oriontask.organization.application.port.in.AcceptMembershipInvitationCommand;
 import com.oriontask.organization.application.port.in.AcceptMembershipInvitationUseCase;
+import com.oriontask.organization.application.port.in.RevokeMembershipCommand;
+import com.oriontask.organization.application.port.in.RevokeMembershipUseCase;
 import com.oriontask.organization.application.port.out.OrganizationStore;
 import com.oriontask.organization.domain.model.Membership;
 import com.oriontask.organization.domain.model.Organization;
@@ -54,6 +56,9 @@ class OrionTaskApplicationTest {
 
   @org.springframework.beans.factory.annotation.Autowired
   private AcceptMembershipInvitationUseCase acceptMembershipInvitationUseCase;
+
+  @org.springframework.beans.factory.annotation.Autowired
+  private RevokeMembershipUseCase revokeMembershipUseCase;
 
   private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -687,6 +692,240 @@ class OrionTaskApplicationTest {
         .isEqualTo(1);
   }
 
+  @Test
+  @DirtiesContext(methodMode = DirtiesContext.MethodMode.BEFORE_METHOD)
+  void membershipRevocationRequiresAuthorityCsrfAndKeepsOtherOrganizationsAccessible()
+      throws Exception {
+    String password = "long-password-membership-revocation";
+    UUID ownerId = createAccount("revoke-owner@example.com", password);
+    UUID adminId = createAccount("revoke-admin@example.com", password);
+    UUID technicianId = createAccount("revoke-technician@example.com", password);
+    UUID otherOwnerId = createAccount("revoke-other-owner@example.com", password);
+    HttpResponse<String> ownerLogin = authenticatedLogin("revoke-owner@example.com", password);
+    UUID organizationId = createOrganizationForSession(ownerLogin, "Revocation Organization");
+    addMembership(organizationId, adminId, "ADMIN");
+    addMembership(organizationId, technicianId, "TECHNICIAN");
+
+    HttpResponse<String> otherOwnerLogin =
+        authenticatedLogin("revoke-other-owner@example.com", password);
+    UUID otherOrganizationId =
+        createOrganizationForSession(otherOwnerLogin, "Other Revocation Organization");
+    addMembership(otherOrganizationId, technicianId, "TECHNICIAN");
+
+    String ownerTechnicalSession = cookieValue(ownerLogin, "JSESSIONID");
+    HttpResponse<String> ownerCsrf = csrf(ownerTechnicalSession);
+    HttpResponse<String> revoked =
+        revokeMembership(
+            organizationId,
+            technicianId,
+            csrfToken(ownerCsrf),
+            ownerTechnicalSession,
+            cookieValue(ownerLogin, "__Host-oriontask-session"));
+
+    HttpResponse<String> technicianLogin =
+        authenticatedLogin("revoke-technician@example.com", password);
+    HttpResponse<String> accessAfterRevocation =
+        getOrganization(organizationId, cookieValue(technicianLogin, "__Host-oriontask-session"));
+    HttpResponse<String> otherOrganizationAccess =
+        getOrganization(
+            otherOrganizationId, cookieValue(technicianLogin, "__Host-oriontask-session"));
+    HttpResponse<String> adminLogin = authenticatedLogin("revoke-admin@example.com", password);
+    String adminTechnicalSession = cookieValue(adminLogin, "JSESSIONID");
+    HttpResponse<String> adminCsrf = csrf(adminTechnicalSession);
+    HttpResponse<String> denied =
+        revokeMembership(
+            organizationId,
+            ownerId,
+            csrfToken(adminCsrf),
+            adminTechnicalSession,
+            cookieValue(adminLogin, "__Host-oriontask-session"));
+
+    assertThat(revoked.statusCode()).isEqualTo(204);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from organization_memberships where organization_id = ? and account_id = ?",
+                Integer.class,
+                organizationId,
+                technicianId))
+        .isZero();
+    assertThat(accessAfterRevocation.statusCode()).isEqualTo(404);
+    assertThat(otherOrganizationAccess.statusCode()).isEqualTo(200);
+    assertThat(denied.statusCode()).isEqualTo(403);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from organization_memberships where organization_id = ? and account_id = ?",
+                Integer.class,
+                organizationId,
+                ownerId))
+        .isEqualTo(1);
+  }
+
+  @Test
+  @DirtiesContext(methodMode = DirtiesContext.MethodMode.BEFORE_METHOD)
+  void membershipRevocationHidesMissingMembershipAndRejectsInvalidRequests() throws Exception {
+    String password = "long-password-invalid-membership-revocation";
+    UUID ownerId = createAccount("invalid-revoke-owner@example.com", password);
+    UUID technicianId = createAccount("invalid-revoke-technician@example.com", password);
+    HttpResponse<String> ownerLogin =
+        authenticatedLogin("invalid-revoke-owner@example.com", password);
+    UUID organizationId =
+        createOrganizationForSession(ownerLogin, "Invalid Revocation Organization");
+    addMembership(organizationId, technicianId, "TECHNICIAN");
+    String technicalSession = cookieValue(ownerLogin, "JSESSIONID");
+    String sessionToken = cookieValue(ownerLogin, "__Host-oriontask-session");
+    HttpResponse<String> csrf = csrf(technicalSession);
+
+    HttpResponse<String> missing =
+        revokeMembership(
+            organizationId, UUID.randomUUID(), csrfToken(csrf), technicalSession, sessionToken);
+    HttpResponse<String> missingOrganization =
+        revokeMembership(
+            UUID.randomUUID(),
+            technicianId,
+            csrfToken(csrf(technicalSession)),
+            technicalSession,
+            sessionToken);
+    HttpResponse<String> malformed =
+        revokeMembership(
+            "not-a-uuid",
+            technicianId.toString(),
+            csrfToken(csrf(technicalSession)),
+            technicalSession,
+            sessionToken);
+    HttpResponse<String> withoutCsrf =
+        revokeMembershipWithoutCsrf(organizationId, technicianId, technicalSession, sessionToken);
+
+    assertThat(ownerId).isNotNull();
+    assertThat(missing.statusCode()).isEqualTo(404);
+    assertThat(missingOrganization.statusCode()).isEqualTo(404);
+    assertThat(missing.body()).isEqualTo(missingOrganization.body());
+    assertThat(malformed.statusCode()).isEqualTo(400);
+    assertThat(withoutCsrf.statusCode()).isEqualTo(403);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from organization_memberships where organization_id = ? and account_id = ?",
+                Integer.class,
+                organizationId,
+                technicianId))
+        .isEqualTo(1);
+  }
+
+  @Test
+  @DirtiesContext(methodMode = DirtiesContext.MethodMode.BEFORE_METHOD)
+  void concurrentMembershipRevocationDeletesOnlyOnce() throws Exception {
+    String password = "long-password-concurrent-membership-revocation";
+    UUID ownerId = createAccount("concurrent-revoke-owner@example.com", password);
+    UUID technicianId = createAccount("concurrent-revoke-technician@example.com", password);
+    HttpResponse<String> ownerLogin =
+        authenticatedLogin("concurrent-revoke-owner@example.com", password);
+    UUID organizationId =
+        createOrganizationForSession(ownerLogin, "Concurrent Revocation Organization");
+    addMembership(organizationId, technicianId, "TECHNICIAN");
+
+    Callable<Boolean> revoke =
+        () -> {
+          try {
+            revokeMembershipUseCase.revoke(
+                new RevokeMembershipCommand(organizationId, ownerId, technicianId));
+            return true;
+          } catch (RuntimeException exception) {
+            return false;
+          }
+        };
+    try (ExecutorService executor = Executors.newFixedThreadPool(2)) {
+      long revoked =
+          executor.invokeAll(java.util.List.of(revoke, revoke)).stream()
+              .filter(
+                  future -> {
+                    try {
+                      return future.get();
+                    } catch (Exception exception) {
+                      throw new AssertionError(exception);
+                    }
+                  })
+              .count();
+      assertThat(revoked).isEqualTo(1);
+    }
+
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from organization_memberships where organization_id = ? and account_id = ?",
+                Integer.class,
+                organizationId,
+                technicianId))
+        .isZero();
+  }
+
+  @Test
+  @DirtiesContext(methodMode = DirtiesContext.MethodMode.BEFORE_METHOD)
+  void clientsRequireAuthorizationAndCsrfAndPreserveInactiveRecords() throws Exception {
+    String password = "long-password-client-http";
+    UUID ownerId = createAccount("client-owner@example.com", password);
+    UUID technicianId = createAccount("client-technician@example.com", password);
+    HttpResponse<String> ownerLogin = authenticatedLogin("client-owner@example.com", password);
+    UUID organizationId = createOrganizationForSession(ownerLogin, "Client Organization");
+    addMembership(organizationId, technicianId, "TECHNICIAN");
+    String technicalSession = cookieValue(ownerLogin, "JSESSIONID");
+    String sessionToken = cookieValue(ownerLogin, "__Host-oriontask-session");
+    HttpResponse<String> created =
+        clientRequest(
+            "POST",
+            organizationId,
+            null,
+            Map.of("name", "  Acme  "),
+            csrfToken(csrf(technicalSession)),
+            technicalSession,
+            sessionToken);
+    UUID clientId =
+        jdbcTemplate.queryForObject(
+            "select id from organization_clients where organization_id = ?",
+            UUID.class,
+            organizationId);
+    HttpResponse<String> updated =
+        clientRequest(
+            "PATCH",
+            organizationId,
+            clientId,
+            Map.of("name", "Acme Updated"),
+            csrfToken(csrf(technicalSession)),
+            technicalSession,
+            sessionToken);
+    HttpResponse<String> deactivated =
+        clientRequest(
+            "DELETE",
+            organizationId,
+            clientId,
+            null,
+            csrfToken(csrf(technicalSession)),
+            technicalSession,
+            sessionToken);
+    HttpResponse<String> ownerList =
+        clientRequest("GET", organizationId, null, null, null, technicalSession, sessionToken);
+    HttpResponse<String> inactiveList =
+        clientRequest(
+            "GET", organizationId, null, null, "inactive", technicalSession, sessionToken);
+    HttpResponse<String> technicianLogin =
+        authenticatedLogin("client-technician@example.com", password);
+    String technicianTechnicalSession = cookieValue(technicianLogin, "JSESSIONID");
+    HttpResponse<String> forbidden =
+        clientRequest(
+            "POST",
+            organizationId,
+            null,
+            Map.of("name", "Blocked"),
+            csrfToken(csrf(technicianTechnicalSession)),
+            technicianTechnicalSession,
+            cookieValue(technicianLogin, "__Host-oriontask-session"));
+
+    assertThat(ownerId).isNotNull();
+    assertThat(created.statusCode()).isEqualTo(201);
+    assertThat(updated.statusCode()).isEqualTo(200);
+    assertThat(deactivated.statusCode()).isEqualTo(204);
+    assertThat(ownerList.body()).doesNotContain("Acme Updated");
+    assertThat(inactiveList.body()).contains("Acme Updated");
+    assertThat(forbidden.statusCode()).isEqualTo(403);
+  }
+
   private HttpResponse<String> register(Map<String, String> payload) throws Exception {
     HttpRequest request =
         HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/accounts"))
@@ -814,6 +1053,103 @@ class OrionTaskApplicationTest {
             .POST(HttpRequest.BodyPublishers.noBody())
             .build();
     return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+  }
+
+  private HttpResponse<String> revokeMembership(
+      UUID organizationId,
+      UUID revokedAccountId,
+      String csrfToken,
+      String technicalSession,
+      String sessionToken)
+      throws Exception {
+    return revokeMembership(
+        organizationId.toString(),
+        revokedAccountId.toString(),
+        csrfToken,
+        technicalSession,
+        sessionToken);
+  }
+
+  private HttpResponse<String> revokeMembership(
+      String organizationId,
+      String revokedAccountId,
+      String csrfToken,
+      String technicalSession,
+      String sessionToken)
+      throws Exception {
+    HttpRequest request =
+        HttpRequest.newBuilder(
+                URI.create(
+                    "http://localhost:"
+                        + port
+                        + "/api/v1/organizations/"
+                        + organizationId
+                        + "/members/"
+                        + revokedAccountId))
+            .header("X-CSRF-TOKEN", csrfToken)
+            .header(
+                "Cookie",
+                "JSESSIONID=" + technicalSession + "; __Host-oriontask-session=" + sessionToken)
+            .DELETE()
+            .build();
+    return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+  }
+
+  private HttpResponse<String> revokeMembershipWithoutCsrf(
+      UUID organizationId, UUID revokedAccountId, String technicalSession, String sessionToken)
+      throws Exception {
+    HttpRequest request =
+        HttpRequest.newBuilder(
+                URI.create(
+                    "http://localhost:"
+                        + port
+                        + "/api/v1/organizations/"
+                        + organizationId
+                        + "/members/"
+                        + revokedAccountId))
+            .header(
+                "Cookie",
+                "JSESSIONID=" + technicalSession + "; __Host-oriontask-session=" + sessionToken)
+            .DELETE()
+            .build();
+    return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+  }
+
+  private HttpResponse<String> clientRequest(
+      String method,
+      UUID organizationId,
+      UUID clientId,
+      Map<String, String> payload,
+      String csrfToken,
+      String technicalSession,
+      String sessionToken)
+      throws Exception {
+    String path =
+        "/api/v1/organizations/"
+            + organizationId
+            + "/clients"
+            + (clientId == null ? "" : "/" + clientId)
+            + (method.equals("GET") && csrfToken != null ? "?status=" + csrfToken : "");
+    HttpRequest.Builder request =
+        HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
+            .header(
+                "Cookie",
+                "JSESSIONID=" + technicalSession + "; __Host-oriontask-session=" + sessionToken);
+    if (csrfToken != null && !method.equals("GET")) {
+      request.header("X-CSRF-TOKEN", csrfToken);
+    }
+    if (method.equals("GET")) {
+      request.GET();
+    } else if (method.equals("DELETE")) {
+      request.DELETE();
+    } else {
+      request
+          .header("Content-Type", "application/json")
+          .method(
+              method,
+              HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)));
+    }
+    return HttpClient.newHttpClient().send(request.build(), HttpResponse.BodyHandlers.ofString());
   }
 
   private UUID createOrganizationForSession(HttpResponse<String> login, String name)

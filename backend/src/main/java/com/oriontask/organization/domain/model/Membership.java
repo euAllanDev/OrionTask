@@ -19,6 +19,11 @@ public record Membership(
   public enum Role {
     OWNER,
     ADMIN,
-    TECHNICIAN
+    TECHNICIAN;
+
+    public boolean canRevoke(Role target) {
+      return (this == OWNER && (target == ADMIN || target == TECHNICIAN))
+          || (this == ADMIN && target == TECHNICIAN);
+    }
   }
 }

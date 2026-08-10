@@ -6,8 +6,11 @@ import com.oriontask.organization.application.port.in.AcceptMembershipInvitation
 import com.oriontask.organization.application.port.in.CreateMembershipInvitationCommand;
 import com.oriontask.organization.application.port.in.CreateMembershipInvitationResult;
 import com.oriontask.organization.application.port.in.CreateMembershipInvitationUseCase;
+import com.oriontask.organization.application.port.in.RevokeMembershipCommand;
+import com.oriontask.organization.application.port.in.RevokeMembershipUseCase;
 import com.oriontask.organization.application.usecase.CreateMembershipInvitationService.ForbiddenException;
 import com.oriontask.organization.application.usecase.CreateMembershipInvitationService.NotFoundException;
+import com.oriontask.organization.application.usecase.RevokeMembershipService;
 import com.oriontask.organization.domain.model.Membership;
 import java.time.Instant;
 import java.util.Map;
@@ -16,6 +19,7 @@ import java.util.Set;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -27,12 +31,15 @@ import org.springframework.web.bind.annotation.RestController;
 class MembershipInvitationController {
   private final CreateMembershipInvitationUseCase createUseCase;
   private final AcceptMembershipInvitationUseCase acceptUseCase;
+  private final RevokeMembershipUseCase revokeUseCase;
 
   MembershipInvitationController(
       CreateMembershipInvitationUseCase createUseCase,
-      AcceptMembershipInvitationUseCase acceptUseCase) {
+      AcceptMembershipInvitationUseCase acceptUseCase,
+      RevokeMembershipUseCase revokeUseCase) {
     this.createUseCase = createUseCase;
     this.acceptUseCase = acceptUseCase;
+    this.revokeUseCase = revokeUseCase;
   }
 
   @PostMapping("/organizations/{organizationId}/invitations")
@@ -80,6 +87,28 @@ class MembershipInvitationController {
                 ResponseEntity.status(201)
                     .body(new MembershipResponse(value.id(), value.organizationId(), value.role())))
         .orElseGet(() -> ResponseEntity.notFound().build());
+  }
+
+  @DeleteMapping("/organizations/{organizationId}/members/{revokedAccountId}")
+  ResponseEntity<Void> revoke(
+      @PathVariable String organizationId,
+      @PathVariable String revokedAccountId,
+      @RequestBody(required = false) String body,
+      @AuthenticationPrincipal UUID accountId) {
+    UUID parsedOrganizationId = parseUuid(organizationId);
+    UUID parsedRevokedAccountId = parseUuid(revokedAccountId);
+    if (parsedOrganizationId == null || parsedRevokedAccountId == null || body != null) {
+      return ResponseEntity.badRequest().build();
+    }
+    try {
+      revokeUseCase.revoke(
+          new RevokeMembershipCommand(parsedOrganizationId, accountId, parsedRevokedAccountId));
+      return ResponseEntity.noContent().build();
+    } catch (RevokeMembershipService.NotFoundException exception) {
+      return ResponseEntity.notFound().build();
+    } catch (RevokeMembershipService.ForbiddenException exception) {
+      return ResponseEntity.status(403).build();
+    }
   }
 
   private static UUID parseUuid(String value) {

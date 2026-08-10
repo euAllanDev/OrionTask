@@ -1,6 +1,7 @@
 package com.oriontask.organization.adapter.out.persistence;
 
 import com.oriontask.organization.application.port.out.MembershipInvitationStore;
+import com.oriontask.organization.application.port.out.MembershipRevocationStore;
 import com.oriontask.organization.application.port.out.OrganizationStore;
 import com.oriontask.organization.domain.model.Membership;
 import com.oriontask.organization.domain.model.MembershipInvitation;
@@ -12,7 +13,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 @Component
-class JpaOrganizationStore implements OrganizationStore, MembershipInvitationStore {
+class JpaOrganizationStore
+    implements OrganizationStore, MembershipInvitationStore, MembershipRevocationStore {
   private final OrganizationJpaRepository organizationRepository;
   private final MembershipJpaRepository membershipRepository;
   private final MembershipInvitationJpaRepository invitationRepository;
@@ -105,5 +107,28 @@ class JpaOrganizationStore implements OrganizationStore, MembershipInvitationSto
             invitation.organizationId(),
             invitation.recipientAccountId(),
             membership));
+  }
+
+  @Override
+  @Transactional
+  public Result revoke(UUID organizationId, UUID actorAccountId, UUID revokedAccountId) {
+    if (organizationRepository.findByIdForUpdate(organizationId).isEmpty()) {
+      return Result.ACTOR_NOT_FOUND;
+    }
+    Optional<MembershipJpaEntity> actor =
+        membershipRepository.findByOrganizationIdAndAccountId(organizationId, actorAccountId);
+    if (actor.isEmpty()) {
+      return Result.ACTOR_NOT_FOUND;
+    }
+    Optional<MembershipJpaEntity> target =
+        membershipRepository.findByOrganizationIdAndAccountId(organizationId, revokedAccountId);
+    if (target.isEmpty()) {
+      return Result.TARGET_NOT_FOUND;
+    }
+    if (!actor.get().role().canRevoke(target.get().role())) {
+      return Result.FORBIDDEN;
+    }
+    membershipRepository.delete(target.get());
+    return Result.REVOKED;
   }
 }
