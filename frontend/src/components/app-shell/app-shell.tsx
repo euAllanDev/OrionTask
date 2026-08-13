@@ -1,22 +1,52 @@
 "use client";
 
-import { Menu, X } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { LogOut, Menu, X } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
-
-const navigation = ["Visão geral", "Clientes", "Membros"];
+import { logout } from "@/features/auth/api";
+import { useAuth } from "@/features/auth/auth-provider";
+import type { Organization } from "@/features/organizations/api";
 
 export function AppShell({
-  organizationId,
+  organization,
+  organizations,
+  email,
   children,
 }: {
-  organizationId: string;
+  organization: Organization;
+  organizations: Organization[];
+  email: string;
   children: React.ReactNode;
 }) {
+  const router = useRouter();
+  const { setUnauthenticated } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [logoutError, setLogoutError] = useState(false);
   const reducedMotion = useReducedMotion();
+
+  async function handleLogout() {
+    if (pending) return;
+    setPending(true);
+    setLogoutError(false);
+    try {
+      const response = await logout();
+      if (response.status === 204 || response.status === 401) {
+        setUnauthenticated();
+        router.replace("/login");
+      } else {
+        setLogoutError(true);
+      }
+    } catch {
+      setLogoutError(true);
+    } finally {
+      setPending(false);
+    }
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-950">
@@ -33,16 +63,33 @@ export function AppShell({
             {menuOpen ? <X /> : <Menu />}
           </Button>
           <p className="truncate text-sm font-medium text-slate-700">
-            Organização {organizationId}
+            {organization.name}
           </p>
         </div>
-        <p className="text-sm font-semibold tracking-[0.14em] text-blue-700">
-          ORIONTASK
-        </p>
+        <div className="flex items-center gap-3">
+          <p className="hidden text-sm text-slate-500 sm:block">{email}</p>
+          <Button
+            aria-label="Sair"
+            disabled={pending}
+            onClick={() => void handleLogout()}
+            size="icon"
+            variant="ghost"
+          >
+            <LogOut />
+          </Button>
+          {logoutError && (
+            <p className="sr-only" role="alert">
+              Não foi possível encerrar sua sessão. Tente novamente.
+            </p>
+          )}
+        </div>
       </header>
       <div className="flex">
-        <aside className="hidden w-60 shrink-0 border-r border-slate-200 bg-white p-4 lg:block">
-          <Navigation />
+        <aside className="hidden w-64 shrink-0 border-r border-slate-200 bg-white p-4 lg:block">
+          <Navigation
+            currentId={organization.id}
+            organizations={organizations}
+          />
         </aside>
         <AnimatePresence initial={false}>
           {menuOpen && (
@@ -53,7 +100,11 @@ export function AppShell({
               initial={reducedMotion ? false : { opacity: 0, x: -12 }}
               transition={{ duration: reducedMotion ? 0 : 0.16 }}
             >
-              <Navigation />
+              <Navigation
+                currentId={organization.id}
+                organizations={organizations}
+                onNavigate={() => setMenuOpen(false)}
+              />
             </motion.aside>
           )}
         </AnimatePresence>
@@ -63,20 +114,34 @@ export function AppShell({
   );
 }
 
-function Navigation() {
+function Navigation({
+  currentId,
+  organizations,
+  onNavigate,
+}: {
+  currentId: string;
+  organizations: Organization[];
+  onNavigate?: () => void;
+}) {
   return (
-    <nav aria-label="Navegação da organização">
+    <nav aria-label="Organizações">
+      <p className="px-3 pb-2 text-xs font-semibold tracking-wider text-slate-500">
+        ORGANIZAÇÕES
+      </p>
       <ul className="space-y-1">
-        {navigation.map((item, index) => (
-          <li
-            className={
-              index === 0
-                ? "rounded-md bg-blue-50 px-3 py-2 text-sm font-medium text-blue-800"
-                : "px-3 py-2 text-sm text-slate-600"
-            }
-            key={item}
-          >
-            {item}
+        {organizations.map((organization) => (
+          <li key={organization.id}>
+            <Link
+              className={
+                organization.id === currentId
+                  ? "block rounded-md bg-blue-50 px-3 py-2 text-sm font-medium text-blue-800"
+                  : "block rounded-md px-3 py-2 text-sm text-slate-600 hover:bg-slate-100"
+              }
+              href={`/organizations/${organization.id}`}
+              onClick={onNavigate}
+            >
+              {organization.name}
+            </Link>
           </li>
         ))}
       </ul>
