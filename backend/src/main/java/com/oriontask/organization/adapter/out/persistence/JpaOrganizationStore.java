@@ -1,5 +1,8 @@
 package com.oriontask.organization.adapter.out.persistence;
 
+import com.oriontask.audit.application.port.out.AuditEventStore;
+import com.oriontask.audit.domain.model.AuditAction;
+import com.oriontask.audit.domain.model.AuditEvent;
 import com.oriontask.organization.application.port.out.MembershipInvitationStore;
 import com.oriontask.organization.application.port.out.MembershipRevocationStore;
 import com.oriontask.organization.application.port.out.OrganizationStore;
@@ -18,14 +21,17 @@ class JpaOrganizationStore
   private final OrganizationJpaRepository organizationRepository;
   private final MembershipJpaRepository membershipRepository;
   private final MembershipInvitationJpaRepository invitationRepository;
+  private final AuditEventStore auditEventStore;
 
   JpaOrganizationStore(
       OrganizationJpaRepository organizationRepository,
       MembershipJpaRepository membershipRepository,
-      MembershipInvitationJpaRepository invitationRepository) {
+      MembershipInvitationJpaRepository invitationRepository,
+      AuditEventStore auditEventStore) {
     this.organizationRepository = organizationRepository;
     this.membershipRepository = membershipRepository;
     this.invitationRepository = invitationRepository;
+    this.auditEventStore = auditEventStore;
   }
 
   @Override
@@ -33,6 +39,13 @@ class JpaOrganizationStore
   public void create(Organization organization, Membership membership) {
     organizationRepository.save(new OrganizationJpaEntity(organization));
     membershipRepository.saveAndFlush(new MembershipJpaEntity(membership));
+    saveAudit(
+        AuditAction.ORGANIZATION_CREATED,
+        organization.id(),
+        "organization",
+        organization.id(),
+        organization.createdAt(),
+        membership.accountId());
   }
 
   @Override
@@ -51,7 +64,8 @@ class JpaOrganizationStore
 
   @Override
   @Transactional
-  public boolean createIfEligible(MembershipInvitation invitation, Instant now) {
+  public boolean createIfEligible(
+      MembershipInvitation invitation, UUID creatorAccountId, Instant now) {
     // Serialize invitation creation per organization before checking partial uniqueness.
     organizationRepository.findByIdForUpdate(invitation.organizationId()).orElseThrow();
     if (membershipRepository
@@ -71,6 +85,13 @@ class JpaOrganizationStore
       invitationRepository.flush();
     }
     invitationRepository.saveAndFlush(new MembershipInvitationJpaEntity(invitation));
+    saveAudit(
+        AuditAction.MEMBERSHIP_INVITATION_CREATED,
+        invitation.organizationId(),
+        "membership_invitation",
+        invitation.id(),
+        now,
+        creatorAccountId);
     return true;
   }
 
@@ -101,6 +122,13 @@ class JpaOrganizationStore
         new Membership(
             UUID.randomUUID(), invitation.organizationId(), accountId, invitation.role(), now, now);
     membershipRepository.saveAndFlush(new MembershipJpaEntity(membership));
+    saveAudit(
+        AuditAction.MEMBERSHIP_INVITATION_ACCEPTED,
+        invitation.organizationId(),
+        "membership",
+        membership.id(),
+        now,
+        accountId);
     return Optional.of(
         new AcceptedInvitation(
             invitation.id(),
@@ -129,6 +157,40 @@ class JpaOrganizationStore
       return Result.FORBIDDEN;
     }
     membershipRepository.delete(target.get());
+    saveAudit(
+        AuditAction.ORGANIZATION_MEMBERSHIP_REVOKED,
+        organizationId,
+        "membership",
+        target.get().id(),
+        Instant.now(),
+        actorAccountId);
     return Result.REVOKED;
+  }
+
+  private void saveAudit(
+      AuditAction action,
+      UUID organizationId,
+      String resourceType,
+      UUID resourceId,
+      Instant occurredAt) {
+    saveAudit(action, organizationId, resourceType, resourceId, occurredAt, null);
+  }
+
+  private void saveAudit(
+      AuditAction action,
+      UUID organizationId,
+      String resourceType,
+      UUID resourceId,
+      Instant occurredAt,
+      UUID actorAccountId) {
+    auditEventStore.save(
+        new AuditEvent(
+            UUID.randomUUID(),
+            organizationId,
+            actorAccountId == null ? resourceId : actorAccountId,
+            action,
+            resourceType,
+            resourceId,
+            occurredAt));
   }
 }

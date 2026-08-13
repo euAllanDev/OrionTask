@@ -9,7 +9,7 @@ import java.util.UUID;
 public interface MembershipInvitationStore {
   Optional<Membership.Role> findMembershipRole(UUID organizationId, UUID accountId);
 
-  boolean createIfEligible(MembershipInvitation invitation, Instant now);
+  boolean createIfEligible(MembershipInvitation invitation, UUID creatorAccountId, Instant now);
 
   Optional<AcceptedInvitation> accept(String tokenDerivation, UUID accountId, Instant now);
 

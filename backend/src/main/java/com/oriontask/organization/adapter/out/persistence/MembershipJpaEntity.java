@@ -42,4 +42,8 @@ class MembershipJpaEntity {
   Membership.Role role() {
     return Membership.Role.valueOf(role);
   }
+
+  UUID id() {
+    return id;
+  }
 }

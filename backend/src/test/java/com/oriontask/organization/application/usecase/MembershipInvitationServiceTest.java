@@ -148,7 +148,8 @@ class MembershipInvitationServiceTest {
     }
 
     @Override
-    public boolean createIfEligible(MembershipInvitation invitation, Instant now) {
+    public boolean createIfEligible(
+        MembershipInvitation invitation, UUID creatorAccountId, Instant now) {
       created = invitation;
       return true;
     }

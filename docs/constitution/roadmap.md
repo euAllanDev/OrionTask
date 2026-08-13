@@ -22,7 +22,7 @@ Este roadmap é vivo. Cada item funcional deve ser executado como uma change Ope
 - [x] Revogação de acesso
 - [x] Cadastro, edição e desativação de clientes
 - [x] Testes de isolamento organizacional
-- [ ] Auditoria de ações críticas
+- [x] Auditoria de ações críticas
 
 ## Fase 2 — Núcleo de tickets
 

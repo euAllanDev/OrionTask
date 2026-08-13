@@ -72,7 +72,7 @@ public class CreateMembershipInvitationService implements CreateMembershipInvita
                       expiresAt,
                       now,
                       null);
-              if (store.createIfEligible(invitation, now)) {
+              if (store.createIfEligible(invitation, command.creatorAccountId(), now)) {
                 try {
                   audit.invitationCreated(
                       invitation.id(),

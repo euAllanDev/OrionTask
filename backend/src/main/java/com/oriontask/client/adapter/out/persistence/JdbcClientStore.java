@@ -1,7 +1,11 @@
 package com.oriontask.client.adapter.out.persistence;
 
+import com.oriontask.audit.application.port.out.AuditEventStore;
+import com.oriontask.audit.domain.model.AuditAction;
+import com.oriontask.audit.domain.model.AuditEvent;
 import com.oriontask.client.application.port.out.ClientStore;
 import com.oriontask.client.domain.model.Client;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -12,9 +16,11 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 class JdbcClientStore implements ClientStore {
   private final JdbcTemplate jdbc;
+  private final AuditEventStore auditEventStore;
 
-  JdbcClientStore(JdbcTemplate jdbc) {
+  JdbcClientStore(JdbcTemplate jdbc, AuditEventStore auditEventStore) {
     this.jdbc = jdbc;
+    this.auditEventStore = auditEventStore;
   }
 
   @Override
@@ -29,6 +35,7 @@ class JdbcClientStore implements ClientStore {
         clientId,
         organizationId,
         name);
+    saveAudit(AuditAction.ORGANIZATION_CLIENT_CREATED, organizationId, accountId, clientId);
     return Result.CREATED;
   }
 
@@ -93,14 +100,19 @@ class JdbcClientStore implements ClientStore {
     if (access != null) {
       return access;
     }
-    return jdbc.update(
-                "update organization_clients set name = ?, updated_at = current_timestamp where organization_id = ? and id = ?",
-                name,
-                organizationId,
-                clientId)
-            == 1
-        ? Result.UPDATED
-        : Result.NOT_FOUND;
+    Result result =
+        jdbc.update(
+                    "update organization_clients set name = ?, updated_at = current_timestamp where organization_id = ? and id = ?",
+                    name,
+                    organizationId,
+                    clientId)
+                == 1
+            ? Result.UPDATED
+            : Result.NOT_FOUND;
+    if (result == Result.UPDATED) {
+      saveAudit(AuditAction.ORGANIZATION_CLIENT_UPDATED, organizationId, accountId, clientId);
+    }
+    return result;
   }
 
   @Override
@@ -110,13 +122,18 @@ class JdbcClientStore implements ClientStore {
     if (access != null) {
       return access;
     }
-    return jdbc.update(
-                "update organization_clients set status = 'INACTIVE', deactivated_at = current_timestamp, updated_at = current_timestamp where organization_id = ? and id = ?",
-                organizationId,
-                clientId)
-            == 1
-        ? Result.DEACTIVATED
-        : Result.NOT_FOUND;
+    Result result =
+        jdbc.update(
+                    "update organization_clients set status = 'INACTIVE', deactivated_at = current_timestamp, updated_at = current_timestamp where organization_id = ? and id = ?",
+                    organizationId,
+                    clientId)
+                == 1
+            ? Result.DEACTIVATED
+            : Result.NOT_FOUND;
+    if (result == Result.DEACTIVATED) {
+      saveAudit(AuditAction.ORGANIZATION_CLIENT_DEACTIVATED, organizationId, accountId, clientId);
+    }
+    return result;
   }
 
   private boolean hasMembership(UUID organizationId, UUID accountId) {
@@ -139,5 +156,17 @@ class JdbcClientStore implements ClientStore {
       return Result.NOT_FOUND;
     }
     return roles.getFirst().equals("TECHNICIAN") ? Result.FORBIDDEN : null;
+  }
+
+  private void saveAudit(AuditAction action, UUID organizationId, UUID accountId, UUID clientId) {
+    auditEventStore.save(
+        new AuditEvent(
+            UUID.randomUUID(),
+            organizationId,
+            accountId,
+            action,
+            "client",
+            clientId,
+            Instant.now()));
   }
 }
