@@ -1,6 +1,7 @@
 package com.oriontask.organization.adapter.out.persistence;
 
 import jakarta.persistence.LockModeType;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -25,4 +26,15 @@ interface OrganizationJpaRepository extends JpaRepository<OrganizationJpaEntity,
       """)
   Optional<OrganizationJpaEntity> findAuthorized(
       @Param("organizationId") UUID organizationId, @Param("accountId") UUID accountId);
+
+  @Query(
+      """
+      select organization.id as id, organization.name as name, organization.createdAt as createdAt,
+             organization.updatedAt as updatedAt, membership.role as role
+      from OrganizationJpaEntity organization join MembershipJpaEntity membership
+        on membership.organizationId = organization.id
+      where membership.accountId = :accountId
+      order by organization.updatedAt desc, organization.id desc
+      """)
+  List<OrganizationMembershipProjection> findAllForAccount(@Param("accountId") UUID accountId);
 }

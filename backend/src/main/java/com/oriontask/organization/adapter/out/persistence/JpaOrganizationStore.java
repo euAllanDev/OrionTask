@@ -3,6 +3,7 @@ package com.oriontask.organization.adapter.out.persistence;
 import com.oriontask.audit.application.port.out.AuditEventStore;
 import com.oriontask.audit.domain.model.AuditAction;
 import com.oriontask.audit.domain.model.AuditEvent;
+import com.oriontask.organization.application.port.in.ListedOrganization;
 import com.oriontask.organization.application.port.out.MembershipInvitationStore;
 import com.oriontask.organization.application.port.out.MembershipRevocationStore;
 import com.oriontask.organization.application.port.out.OrganizationStore;
@@ -10,6 +11,7 @@ import com.oriontask.organization.domain.model.Membership;
 import com.oriontask.organization.domain.model.MembershipInvitation;
 import com.oriontask.organization.domain.model.Organization;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
@@ -53,6 +55,20 @@ class JpaOrganizationStore
     return organizationRepository
         .findAuthorized(organizationId, accountId)
         .map(OrganizationJpaEntity::toDomain);
+  }
+
+  @Override
+  public List<ListedOrganization> findAllForAccount(UUID accountId) {
+    return organizationRepository.findAllForAccount(accountId).stream()
+        .map(
+            organization ->
+                new ListedOrganization(
+                    organization.getId(),
+                    organization.getName(),
+                    organization.getCreatedAt(),
+                    organization.getUpdatedAt(),
+                    Membership.Role.valueOf(organization.getRole())))
+        .toList();
   }
 
   @Override

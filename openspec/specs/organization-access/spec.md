@@ -20,6 +20,43 @@ Todo endpoint organizacional DEVE receber `organizationId` explicito no path. Si
 
 Sistema NAO DEVE carregar organizacao apenas por `organizationId` e usar leitura isolada como decisao de autorizacao. UUID conhecido NAO DEVE conceder acesso.
 
+### Requirement: Listagem autenticada das organizacoes da conta
+
+`GET /api/v1/organizations` DEVE exigir sessao server-side persistida valida e NAO DEVE exigir CSRF. Sistema DEVE obter `accountId` exclusivamente da sessao persistida; corpo, query, header, `JSESSIONID` ou identificador de conta enviado pelo cliente NAO DEVEM definir identidade.
+
+Sistema DEVE retornar somente organizacoes com membership atual para `accountId`. Cada item DEVE conter somente `id`, `name`, `createdAt`, `updatedAt` e `role` da membership atual. `role` DEVE aceitar somente `OWNER`, `ADMIN` ou `TECHNICIAN`. Sistema NAO DEVE retornar membros, convites, e-mail, permissao derivada, organizacao ativa, token ou cookie.
+
+#### Scenario: conta lista somente suas organizacoes
+
+- DADO conta autenticada com memberships em duas organizacoes;
+- E outra organizacao sem membership para essa conta;
+- QUANDO requisitar `GET /api/v1/organizations`;
+- ENTAO sistema DEVE retornar somente as duas organizacoes da conta;
+- E cada item DEVE conter papel atual da membership correspondente.
+
+### Requirement: Ordem e lista vazia deterministicas
+
+Sistema DEVE ordenar organizacoes por `updatedAt` decrescente e `id` decrescente. Endpoint NAO DEVE aceitar paginacao, filtros, busca ou ordenacao configuravel nesta capacidade. Conta autenticada sem memberships DEVE receber `200 OK` com array vazio.
+
+Corpo ou parametro query enviado ao endpoint DEVE retornar `400 Bad Request` sem alterar dados.
+
+#### Scenario: conta sem organizacao retorna lista vazia
+
+- DADO conta autenticada sem membership;
+- QUANDO requisitar listagem sem corpo ou query;
+- ENTAO sistema DEVE retornar `200 OK` com `[]`.
+
+### Requirement: Listagem nao concede acesso persistente
+
+Organizacao sem membership atual NAO DEVE aparecer na listagem. Sessao ausente, expirada ou revogada DEVE seguir resposta global de autenticacao generica. Resposta de lista pode ficar obsoleta apos revogacao concorrente e NAO DEVE conceder acesso a endpoint organizacional subsequente; cada endpoint com `organizationId` DEVE revalidar membership atual.
+
+#### Scenario: membership revogada nao autoriza rota posterior
+
+- DADO conta recebeu lista contendo organizacao autorizada;
+- E membership for revogada depois da resposta;
+- QUANDO conta requisitar recurso da organizacao com UUID previamente listado;
+- ENTAO endpoint posterior DEVE negar acesso conforme seu contrato de autorizacao atual.
+
 ### Requirement: Leitura organizacional autorizada
 
 `GET /api/v1/organizations/{organizationId}` DEVE retornar `200 OK` e somente `id`, `name`, `createdAt` e `updatedAt` para membership existente. UUID malformado DEVE retornar `400 Bad Request`.
@@ -83,3 +120,5 @@ Depois de commit de revogacao efetiva, sistema DEVE registrar evento operacional
 Suite de integracao com PostgreSQL DEVE demonstrar que conta autenticada sem membership na organizacao alvo nao consegue ler organizacao, listar clientes, ler cliente, alterar cliente, desativar cliente ou revogar membership daquela organizacao, mesmo conhecendo UUIDs validos. Onde especificacao define `404 Not Found` indistinguivel, teste DEVE comparar status e corpo com recurso inexistente equivalente.
 
 Testes de mutacao negada DEVEM usar CSRF valido da conta nao autorizada e confirmar que clientes e memberships de ambas organizacoes permanecem inalterados apos a resposta. Suite DEVE cobrir duas organizacoes distintas e ao menos uma conta autenticada por tenant.
+
+Testes unitarios DEVEM cobrir mapeamento de item, papel e ordenacao da listagem. Testes HTTP com PostgreSQL/Testcontainers DEVEM cobrir sessao valida, os tres papeis, lista vazia, isolamento por membership, ordem deterministica, ausencia de CSRF, `401` sem sessao e `400` para corpo ou query.

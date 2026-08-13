@@ -4,6 +4,7 @@ import com.oriontask.organization.application.port.in.AcceptMembershipInvitation
 import com.oriontask.organization.application.port.in.CreateMembershipInvitationUseCase;
 import com.oriontask.organization.application.port.in.CreateOrganizationUseCase;
 import com.oriontask.organization.application.port.in.GetAuthorizedOrganizationUseCase;
+import com.oriontask.organization.application.port.in.ListOrganizationsUseCase;
 import com.oriontask.organization.application.port.in.RevokeMembershipUseCase;
 import com.oriontask.organization.application.port.out.InvitationRecipientLookup;
 import com.oriontask.organization.application.port.out.InvitationTokenDeriver;
@@ -18,6 +19,7 @@ import com.oriontask.organization.application.usecase.AcceptMembershipInvitation
 import com.oriontask.organization.application.usecase.CreateMembershipInvitationService;
 import com.oriontask.organization.application.usecase.CreateOrganizationService;
 import com.oriontask.organization.application.usecase.GetAuthorizedOrganizationService;
+import com.oriontask.organization.application.usecase.ListOrganizationsService;
 import com.oriontask.organization.application.usecase.RevokeMembershipService;
 import java.time.Clock;
 import org.springframework.context.annotation.Bean;
@@ -35,6 +37,11 @@ class OrganizationConfiguration {
   GetAuthorizedOrganizationUseCase getAuthorizedOrganizationUseCase(
       OrganizationStore organizationStore) {
     return new GetAuthorizedOrganizationService(organizationStore);
+  }
+
+  @Bean
+  ListOrganizationsUseCase listOrganizationsUseCase(OrganizationStore organizationStore) {
+    return new ListOrganizationsService(organizationStore);
   }
 
   @Bean
