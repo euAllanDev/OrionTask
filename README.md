@@ -15,7 +15,7 @@ Este repositório será desenvolvido com:
 
 ## Estado atual
 
-A fundação técnica, a criação de conta interna, a autenticação por sessão, a criação de organização, o acesso organizacional, os convites de usuários, a revogação de membros, a gestão de clientes, a fundação frontend, os testes de isolamento organizacional e a auditoria de ações críticas foram concluídos e arquivados localmente. A abertura de pull requests e a validação remota do CI permanecem adiadas por decisão do responsável.
+A fundação técnica, a criação de conta interna, a autenticação por sessão, a identidade da sessão atual, a criação de organização, o acesso organizacional, a listagem de organizações da conta, os convites de usuários, a revogação de membros, a gestão de clientes, a fundação frontend, a autenticação funcional do frontend, o shell organizacional do frontend, os testes de isolamento organizacional, a auditoria de ações críticas, a abertura de ticket e a consulta/listagem de tickets foram concluídos e arquivados localmente. A abertura de pull requests e a validação remota do CI permanecem adiadas por decisão do responsável.
 
 ## Documentos fundamentais
 
@@ -38,7 +38,7 @@ A fundação técnica, a criação de conta interna, a autenticação por sessã
 
 ## Change ativa
 
-Não há change ativa. O próximo ponto de partida é explorar e propor abertura de ticket, definindo dados mínimos, autoridade, cliente associado, prioridade, categoria e estado inicial antes de implementar. Validação formal de controlador e orientação jurídica para auditoria permanece obrigatória antes da exposição pública.
+Não há change ativa. Próxima capacidade exige exploração, proposal e aprovação humana antes de implementação. Validação formal de controlador e orientação jurídica para auditoria permanece obrigatória antes da exposição pública.
 
 ## Execução local
 
@@ -50,4 +50,4 @@ Pré-requisitos: Java 21 e Docker Desktop em execução.
 4. Execute `mvnw.cmd spring-boot:run` no Windows ou `./mvnw spring-boot:run` em ambientes POSIX.
 5. Consulte `http://localhost:8080/actuator/health`.
 
-Os endpoints atuais são `/actuator/health`, `POST /api/v1/accounts`, `GET /api/v1/csrf`, `POST /api/v1/sessions`, `DELETE /api/v1/session`, `POST /api/v1/organizations`, `GET /api/v1/organizations/{organizationId}`, `POST /api/v1/organizations/{organizationId}/invitations`, `POST /api/v1/membership-invitations/{token}/accept`, `DELETE /api/v1/organizations/{organizationId}/members/{accountId}`, `POST /api/v1/organizations/{organizationId}/clients`, `GET /api/v1/organizations/{organizationId}/clients`, `GET /api/v1/organizations/{organizationId}/clients/{clientId}`, `PATCH /api/v1/organizations/{organizationId}/clients/{clientId}`, `DELETE /api/v1/organizations/{organizationId}/clients/{clientId}` e `GET /api/v1/organizations/{organizationId}/audit-events`.
+Os endpoints atuais são `/actuator/health`, `POST /api/v1/accounts`, `GET /api/v1/csrf`, `POST /api/v1/sessions`, `GET /api/v1/session`, `DELETE /api/v1/session`, `POST /api/v1/organizations`, `GET /api/v1/organizations`, `GET /api/v1/organizations/{organizationId}`, `POST /api/v1/organizations/{organizationId}/invitations`, `POST /api/v1/membership-invitations/{token}/accept`, `DELETE /api/v1/organizations/{organizationId}/members/{accountId}`, `POST /api/v1/organizations/{organizationId}/clients`, `GET /api/v1/organizations/{organizationId}/clients`, `GET /api/v1/organizations/{organizationId}/clients/{clientId}`, `PATCH /api/v1/organizations/{organizationId}/clients/{clientId}`, `DELETE /api/v1/organizations/{organizationId}/clients/{clientId}`, `POST /api/v1/organizations/{organizationId}/tickets`, `GET /api/v1/organizations/{organizationId}/tickets`, `GET /api/v1/organizations/{organizationId}/tickets/{ticketId}` e `GET /api/v1/organizations/{organizationId}/audit-events`.

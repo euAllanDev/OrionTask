@@ -20,15 +20,16 @@ Este roadmap é vivo. Cada item funcional deve ser executado como uma change Ope
 - [x] Membership e papéis
 - [x] Convites de usuários
 - [x] Revogação de acesso
+- [x] Listagem das organizações da conta
 - [x] Cadastro, edição e desativação de clientes
 - [x] Testes de isolamento organizacional
 - [x] Auditoria de ações críticas
 
 ## Fase 2 — Núcleo de tickets
 
-- [ ] Abertura de ticket
-- [ ] Consulta de ticket
-- [ ] Listagem paginada
+- [x] Abertura de ticket
+- [x] Consulta de ticket
+- [x] Listagem paginada
 - [ ] Associação e filtro por cliente
 - [ ] Atribuição de técnico
 - [ ] Alteração controlada de status
