@@ -3,6 +3,8 @@ package com.oriontask.identity.configuration;
 import com.oriontask.identity.adapter.in.web.SessionAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.web.SecurityFilterChain;
@@ -49,16 +51,27 @@ class SecurityConfiguration {
             context -> context.securityContextRepository(new NullSecurityContextRepository()))
         .httpBasic(AbstractHttpConfigurer::disable)
         .formLogin(AbstractHttpConfigurer::disable)
-        .exceptionHandling(exception -> exception.accessDeniedHandler(csrfAccessDeniedHandler))
+        .exceptionHandling(
+            exception ->
+                exception
+                    .accessDeniedHandler(csrfAccessDeniedHandler)
+                    .authenticationEntryPoint(
+                        (request, response, authenticationException) ->
+                            response.setStatus(
+                                request.getMethod().equals(HttpMethod.GET.name())
+                                        && (request.getRequestURI().equals("/api/v1/session")
+                                            || request
+                                                .getRequestURI()
+                                                .equals("/api/v1/organizations"))
+                                    ? HttpStatus.UNAUTHORIZED.value()
+                                    : HttpStatus.FORBIDDEN.value())))
         .authorizeHttpRequests(
             authorization ->
                 authorization
                     .requestMatchers(
-                        "/actuator/health",
-                        "/api/v1/accounts",
-                        "/api/v1/csrf",
-                        "/api/v1/sessions",
-                        "/api/v1/session")
+                        "/actuator/health", "/api/v1/accounts", "/api/v1/csrf", "/api/v1/sessions")
+                    .permitAll()
+                    .requestMatchers(HttpMethod.DELETE, "/api/v1/session")
                     .permitAll()
                     .anyRequest()
                     .authenticated())

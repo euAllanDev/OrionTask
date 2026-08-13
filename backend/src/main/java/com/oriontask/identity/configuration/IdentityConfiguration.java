@@ -1,6 +1,7 @@
 package com.oriontask.identity.configuration;
 
 import com.oriontask.identity.application.port.in.AuthenticateAccountUseCase;
+import com.oriontask.identity.application.port.in.GetCurrentSessionIdentityUseCase;
 import com.oriontask.identity.application.port.in.LogoutCurrentSessionUseCase;
 import com.oriontask.identity.application.port.in.RegisterAccountUseCase;
 import com.oriontask.identity.application.port.out.AccountRegistrationAudit;
@@ -13,6 +14,7 @@ import com.oriontask.identity.application.port.out.RegistrationRateLimiter;
 import com.oriontask.identity.application.port.out.SessionTokenGenerator;
 import com.oriontask.identity.application.port.out.TokenDeriver;
 import com.oriontask.identity.application.usecase.AuthenticateAccountService;
+import com.oriontask.identity.application.usecase.GetCurrentSessionIdentityService;
 import com.oriontask.identity.application.usecase.LogoutCurrentSessionService;
 import com.oriontask.identity.application.usecase.RegisterAccountService;
 import java.time.Clock;
@@ -64,5 +66,10 @@ class IdentityConfiguration {
       AuthenticationAudit audit,
       Clock clock) {
     return new LogoutCurrentSessionService(sessionStore, tokenDeriver, audit, clock);
+  }
+
+  @Bean
+  GetCurrentSessionIdentityUseCase getCurrentSessionIdentityUseCase(AccountStore accountStore) {
+    return new GetCurrentSessionIdentityService(accountStore);
   }
 }

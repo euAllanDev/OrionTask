@@ -40,6 +40,11 @@ class JpaAccountStore implements AccountStore, InvitationRecipientLookup {
   }
 
   @Override
+  public Optional<Account> findById(UUID accountId) {
+    return repository.findById(accountId).map(AccountJpaEntity::toDomain);
+  }
+
+  @Override
   public Optional<UUID> findAccountIdByNormalizedEmail(String normalizedEmail) {
     return repository.findByNormalizedEmail(normalizedEmail).map(AccountJpaEntity::id);
   }
