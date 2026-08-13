@@ -15,9 +15,7 @@ Este repositório será desenvolvido com:
 
 ## Estado atual
 
-O projeto está na fase de fundação. A change `bootstrap-project-foundation` foi aprovada e aguarda solicitação explícita para implementação.
-
-Nenhum código de produção deve ser criado antes da aprovação dos documentos fundamentais e da change inicial.
+A fundação técnica, a criação de conta interna, a autenticação por sessão, a identidade da sessão atual, a criação de organização, o acesso organizacional, a listagem de organizações da conta, os convites de usuários, a revogação de membros, a gestão de clientes, a fundação frontend, a autenticação funcional do frontend, o shell organizacional do frontend, os testes de isolamento organizacional, a auditoria de ações críticas, a abertura de ticket e a consulta/listagem de tickets foram concluídos e arquivados localmente. A abertura de pull requests e a validação remota do CI permanecem adiadas por decisão do responsável.
 
 ## Documentos fundamentais
 
@@ -40,9 +38,16 @@ Nenhum código de produção deve ser criado antes da aprovação dos documentos
 
 ## Change ativa
 
-Change aprovada para a fundação técnica, ainda sem código de produção:
+Não há change ativa. Próxima capacidade exige exploração, proposal e aprovação humana antes de implementação. Validação formal de controlador e orientação jurídica para auditoria permanece obrigatória antes da exposição pública.
 
-`openspec/changes/bootstrap-project-foundation/`
+## Execução local
 
-O ponto de retomada da próxima sessão está em `openspec/changes/bootstrap-project-foundation/next-session.md`.
-# OrionTask
+Pré-requisitos: Java 21 e Docker Desktop em execução.
+
+1. Copie `.env.example` para `.env`, gere `ORIONTASK_SESSION_HMAC_KEY` com ao menos 32 bytes e ajuste somente os valores locais, se necessário.
+2. Execute `docker compose --env-file ../.env up -d` em `backend/` para iniciar o PostgreSQL.
+3. Execute `mvnw.cmd verify` no Windows ou `./mvnw verify` em ambientes POSIX, também em `backend/`.
+4. Execute `mvnw.cmd spring-boot:run` no Windows ou `./mvnw spring-boot:run` em ambientes POSIX.
+5. Consulte `http://localhost:8080/actuator/health`.
+
+Os endpoints atuais são `/actuator/health`, `POST /api/v1/accounts`, `GET /api/v1/csrf`, `POST /api/v1/sessions`, `GET /api/v1/session`, `DELETE /api/v1/session`, `POST /api/v1/organizations`, `GET /api/v1/organizations`, `GET /api/v1/organizations/{organizationId}`, `POST /api/v1/organizations/{organizationId}/invitations`, `POST /api/v1/membership-invitations/{token}/accept`, `DELETE /api/v1/organizations/{organizationId}/members/{accountId}`, `POST /api/v1/organizations/{organizationId}/clients`, `GET /api/v1/organizations/{organizationId}/clients`, `GET /api/v1/organizations/{organizationId}/clients/{clientId}`, `PATCH /api/v1/organizations/{organizationId}/clients/{clientId}`, `DELETE /api/v1/organizations/{organizationId}/clients/{clientId}`, `POST /api/v1/organizations/{organizationId}/tickets`, `GET /api/v1/organizations/{organizationId}/tickets`, `GET /api/v1/organizations/{organizationId}/tickets/{ticketId}` e `GET /api/v1/organizations/{organizationId}/audit-events`.
