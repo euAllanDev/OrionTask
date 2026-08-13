@@ -31,25 +31,22 @@ export function responseError(
   );
 }
 
+export type ApiFetchOptions = RequestInit & { csrf?: boolean };
+
 export async function apiFetch(
   path: string,
-  init: RequestInit = {},
+  { csrf = true, ...init }: ApiFetchOptions = {},
 ): Promise<Response> {
   const method = init.method?.toUpperCase() ?? "GET";
-  const mutable = !safeMethods.has(method);
-  const request = async () =>
-    fetch(path, {
-      ...init,
-      credentials: "include",
-      headers: {
-        ...init.headers,
-        ...(mutable ? { "X-CSRF-TOKEN": await csrfToken() } : {}),
-      },
-    });
-  let response = await request();
-  if (mutable && response.status === 403) {
-    clearCsrfToken();
-    response = await request();
-  }
+  const requiresCsrf = csrf && !safeMethods.has(method);
+  const response = await fetch(path, {
+    ...init,
+    credentials: "include",
+    headers: {
+      ...init.headers,
+      ...(requiresCsrf ? { "X-CSRF-TOKEN": await csrfToken() } : {}),
+    },
+  });
+  if (requiresCsrf && response.status === 403) clearCsrfToken();
   return response;
 }
